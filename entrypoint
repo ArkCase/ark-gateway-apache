@@ -1,0 +1,13 @@
+#!/bin/bash
+
+SUPERVISOR_APACHE2_CONF="/etc/supervisor/conf.d/apache2.conf"
+
+# Overlay the configurations present in /conf to /etc/apache2
+# ( cd "${CONF_SRC}" && tar -cf - . ) | tar -C "${CONF_TGT}" -xvf -
+
+cat <<-EOF > "${SUPERVISOR_APACHE2_CONF}"
+[program:apache2]
+command=/usr/sbin/apache2ctl -DFOREGROUND
+EOF
+
+exec /usr/bin/supervisord -n
