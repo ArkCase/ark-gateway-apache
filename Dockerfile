@@ -22,6 +22,7 @@ LABEL IMAGE_SOURCE="https://github.com/ArkCase/ark_gateway_apache"
 RUN apt-get update && apt-get -y dist-upgrade
 RUN apt-get install -y apache2 libapache2-mod-proxy-uwsgi supervisor
 COPY "entrypoint" "/"
+COPY "supervisor-apache2.conf" "/etc/supervisor/conf.d/apache2.conf"
 
 WORKDIR "/etc/apache2"
 RUN ln -vs \
