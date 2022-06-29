@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# MODULES=[+-]modname, ...
+# SITES=[+-]siteName, ...
+# CONFS=[+-]confName, ...
+
+process_module() {
+	local SIGNUM="${1}"
+	local NAME="${2}"
+	# TODO: Link or unlink the module, checking availability
+}
+
+process_site() {
+	local SIGNUM="${1}"
+	local NAME="${2}"
+	# TODO: Link or unlink the site, checking availability
+}
+
+process_conf() {
+	local SIGNUM="${1}"
+	local NAME="${2}"
+	# TODO: Link or unlink the conf, checking availability
+}
+
+process_list() {
+	local CMD="${1}"
+	local SRC="${2}"
+	IFS="," read -r -a VALUES <<< "${SRC}"
+	declare -A NAMES
+	for v in "${VALUES[@]}" ; do
+		[[ "${v}" =~ ^([-+]?)(.+?)$ ]] || continue
+
+		local NAME="${BASH_REMATCH[2]}"
+		[ -z "${NAME}" ] && continue
+
+		local SIGNUM="${BASH_REMATCH[1]}"
+		[ -z "${SIGNUM}" ] && SIGNUM="+"
+
+		case "${SIGNUM}" in
+			+ ) SIGNUM="link" ;;
+			- ) SIGNUM="unlink" ;;
+		esac
+
+		NAMES[${NAME}]="${SIGNUM}"
+	done
+
+	for NAME in "${!NAMES[@]}" ; do
+		local OP="${NAMES[${NAME}]}"
+		[ -z "${RET}" ] || RET+=","
+		"process_${CMD}" "${OP}" "${NAME}"
+	done
+}
