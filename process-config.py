@@ -129,34 +129,34 @@ finally:
 	if not isinstance(document, TYPE_STRING):
 		document.close()
 
-def processSsl(data):
-	print("Processing SSL data from: %s" % data)
+def processSsl(general, section):
+	print("Processing the SSL section from: %s" % (section))
 
-def processModules(data):
-	print("Processing module data from: %s" % data)
+def processModules(general, section):
+	print("Processing the module section from: %s" % (section))
 
-def processSites(data):
-	print("Processing site data from: %s" % data)
+def processSites(general, section):
+	print("Processing the site section from: %s" % (section))
 
-def processConfs(data):
-	print("Processing additional data from: %s" % data)
+def processConfs(general, section):
+	print("Processing the additional configuration section from: %s" % (section))
 
-sections = {}
-sections["ssl"]     = ( "SSL",        processSsl     )
-sections["modules"] = ( "modules",    processModules )
-sections["sites"]   = ( "sites",      processSites   )
-sections["confs"]   = ( "additional", processConfs   )
+sections = []
+sections += [( "ssl",     "SSL",        processSsl     )]
+sections += [( "modules", "modules",    processModules )]
+sections += [( "sites",   "sites",      processSites   )]
+sections += [( "confs",   "additional", processConfs   )]
 
-for key in sections:
-	( label, function ) = sections[key]
+general = {}
+for key, label, function in sections:
 	try:
 		data = yamlData[key]
 		try:
-			function(data)
+			function(general, data)
 		except Exception as e:
 			fail("Failed to process the %s configurations from [%s]: %s" % (label, CONFIG, str(e)))
 	except KeyError:
 		print("No %s configurations found in [%s]" % (label, CONFIG))
 
-print("Configuration modifications applied per [%s]" % (CONFIG))
+print("Configuration applied per [%s]" % (CONFIG))
 sys.exit(0)
