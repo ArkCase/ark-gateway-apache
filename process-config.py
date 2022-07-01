@@ -129,54 +129,34 @@ finally:
 	if not isinstance(document, TYPE_STRING):
 		document.close()
 
-def processSsl(ssl):
-	pass
+def processSsl(data):
+	print("Processing SSL data from: %s" % data)
 
-def processModules(modules):
-	pass
+def processModules(data):
+	print("Processing module data from: %s" % data)
 
-def processSites(sites):
-	pass
+def processSites(data):
+	print("Processing site data from: %s" % data)
 
-def processConfs(confs):
-	pass
+def processConfs(data):
+	print("Processing additional data from: %s" % data)
 
-try:
-	ssl = yamlData["ssl"]
+sections = {}
+sections["ssl"]     = ( "SSL",        processSsl     )
+sections["modules"] = ( "modules",    processModules )
+sections["sites"]   = ( "sites",      processSites   )
+sections["confs"]   = ( "additional", processConfs   )
+
+for key in sections:
+	( label, function ) = sections[key]
 	try:
-		processSsl(ssl)
-	except Exception as e:
-		fail("Failed to process the SSL configurations from [%s]: %s" % (CONFIG, str(e)))
-except KeyError:
-	print("No SSL configurations found in [%s]" % (CONFIG))
-
-try:
-	modules = yamlData["modules"]
-	try:
-		processModules(modules)
-	except Exception as e:
-		fail("Failed to process the module configurations from [%s]: %s" % (CONFIG, str(e)))
-except KeyError:
-	print("No module configurations found in [%s]" % (CONFIG))
-
-try:
-	sites = yamlData["sites"]
-	try:
-		processSites(sites)
-	except Exception as e:
-		fail("Failed to process the site configurations from [%s]: %s" % (CONFIG, str(e)))
-except KeyError:
-	print("No site configurations found in [%s]" % (CONFIG))
-
-try:
-	confs = yamlData["confs"]
-	try:
-		processConfs(confs)
-	except Exception as e:
-		fail("Failed to process the additional configurations from [%s]: %s" % (CONFIG, str(e)))
-except KeyError:
-	print("No additional configurations found in [%s]" % (CONFIG))
+		data = yamlData[key]
+		try:
+			function(data)
+		except Exception as e:
+			fail("Failed to process the %s configurations from [%s]: %s" % (label, CONFIG, str(e)))
+	except KeyError:
+		print("No %s configurations found in [%s]" % (label, CONFIG))
 
 print("Configuration modifications applied per [%s]" % (CONFIG))
 sys.exit(0)
-
