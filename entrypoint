@@ -1,13 +1,11 @@
 #!/bin/bash
 
-# Overlay the configurations present in /conf to /etc/apache2
-# ( cd "${CONF_SRC}" && tar -cf - . ) | tar -C "${CONF_TGT}" -xvf -
+#
+# TODO: Process config.yaml, then start the server
+#
 
 #
-# TODO: Enable sites, modules, configurations, etc., per the environment
-# TODO: devise a means to do this cleanly without too much effort
-# TODO: SSL will be pre-configured to use the cert at /ssl/crt, the key at /ssl/key,
-#       and the ca at /ssl/ca
-# TODO: Other specific SSL configurations can be handled via environment
+# TODO: there must be a /reload command that causes the apache process to reload the configuration
+#
 
 exec /usr/bin/supervisord -n

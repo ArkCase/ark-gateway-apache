@@ -1,0 +1,35 @@
+ssl:
+  cert: certFile-or-base64
+  key: certKeyFile-or-base64
+  ca:
+    - caFile-or-base64-1
+    - caFile-or-base64-2
+    ..
+    - caFile-or-base64-N
+
+modules:
+  module-1: boolean
+  module-2:
+    enabled: boolean
+    conf: |
+      contents of the module's conf
+  ...
+  module-N: ...
+
+sites:
+  site-1: boolean
+  site-2:
+    enabled: boolean
+    conf: |
+      contents of the site
+  ...
+  site-N: ...
+
+confs:
+  conf-1: boolean
+  conf-2:
+    enabled: boolean
+    conf: |
+      contents of the configuration
+  ...
+  conf-N: ...
