@@ -8,6 +8,6 @@ set -eu -o pipefail
 . /etc/apache2/reconfig || exit ${?}
 
 #
-# All is well, start Apache in the foreground
+# All is well, restart Apache gracefully
 #
 echo /usr/sbin/apache2ctl -DFOREGROUND "${@}"

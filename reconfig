@@ -1,0 +1,55 @@
+#!/bin/bash
+SCRIPT="$(readlink -f "${0}")"
+BASEDIR="$(dirname "${SCRIPT}")"
+SCRIPT="$(basename "${SCRIPT}")"
+
+set -eu -o pipefail
+
+#
+# This is the default configuration location, which can be overridden
+# via the environment
+#
+CONFIG="${CONFIG:-/conf/config.yaml}"
+
+timestamp() {
+	date "+%Y/%m/%d %H:%M:%S %Z"
+}
+
+say() {
+	echo -e "$(timestamp): ${@}"
+}
+
+err() {
+	say "ERROR - ${@}" 1>&2
+}
+
+fail() {
+	say "${@}" 1>&2
+	exit ${EXIT_CODE:-1}
+}
+
+#
+# First things first, some housekeeping
+#
+APACHECTL="$(which "apache2ctl")"
+[ -z "${APACHECTL}" ] && fail "Could not find the apachectl executable in the path - cannot continue"
+
+#
+# Process config.yaml to set everything up in the Apache configurations
+#
+ [ -e "${CONFIG}" ] || EXIT_CODE=0 fail "No configuration file found at [${CONFIG}] - will not continue"
+ [ -f "${CONFIG}" ] || fail "The item at [${CONFIG}] is not a regular file - cannot continue"
+ [ -r "${CONFIG}" ] || fail "The file at [${CONFIG}] is not readable - cannot continue"
+
+"${BASEDIR}/process-config.py" "${CONFIG}"
+RC=${?}
+[ ${RC} -eq 0 ] || EXIT_CODE=${RC} fail "Failed to apply the configurations from [${CONFIG}]"
+
+#
+# Make sure the configuration is valid after all the manupulations
+#
+"${APACHECTL}" configtest
+RC=${?}
+[ ${RC} -eq 0 ] || EXIT_CODE=${RC} fail "Configuration test failed (RC=${RC}) - will not gracefully restart the service"
+
+exit 0

@@ -23,10 +23,9 @@ RUN apt-get update && apt-get -y dist-upgrade
 RUN apt-get install -y \
         apache2 \
         libapache2-mod-proxy-uwsgi \
-        python3-yaml \
-        supervisor
-COPY "entrypoint" "/"
-COPY "supervisor-apache2.conf" "/etc/supervisor/conf.d/apache2.conf"
+        python3-yaml
+COPY "entrypoint" "reload" "/"
+COPY "reconfig" "/etc/apache2/reconfig"
 
 WORKDIR "/etc/apache2"
 
@@ -34,11 +33,10 @@ WORKDIR "/etc/apache2"
 # Final parameters
 #
 WORKDIR     "/var/www"
-VOLUME      [ "/ssl" ]
 VOLUME      [ "/conf" ]
-VOLUME      [ "/etc/apache2" ]
 VOLUME      [ "/var/www" ]
 VOLUME      [ "/var/log/apache2" ]
 EXPOSE      80/tcp
 EXPOSE      443/tcp
+STOPSIGNAL  SIGWINCH
 ENTRYPOINT  [ "/entrypoint" ]

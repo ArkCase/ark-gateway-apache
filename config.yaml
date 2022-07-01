@@ -4,7 +4,7 @@ ssl:
   ca:
     - caFile-or-base64-1
     - caFile-or-base64-2
-    ..
+    # ...
     - caFile-or-base64-N
 
 modules:
@@ -13,7 +13,7 @@ modules:
     enabled: boolean
     conf: |
       contents of the module's conf
-  ...
+  # ...
   module-N: ...
 
 sites:
@@ -22,7 +22,7 @@ sites:
     enabled: boolean
     conf: |
       contents of the site
-  ...
+  # ...
   site-N: ...
 
 confs:
@@ -31,5 +31,5 @@ confs:
     enabled: boolean
     conf: |
       contents of the configuration
-  ...
+  # ...
   conf-N: ...
