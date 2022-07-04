@@ -1,11 +1,16 @@
 ssl:
-  cert: certFile-or-base64
-  key: certKeyFile-or-base64
+  cert: certFile-or-pemString
+  key: certKeyFile-or-pemString
   ca:
-    - caFile-or-base64-1
-    - caFile-or-base64-2
+    - caFile-or-pemString-1
+    - caFile-or-pemString-2
     # ...
-    - caFile-or-base64-N
+    - caFile-or-pemString-N
+  # crl:
+  #   - crlFile-or-pemString-1
+  #   - crlFile-or-pemString-2
+  #   # ...
+  #   - crlFile-or-pemString-N
   # serverAdmin: kaka@test
   # documentRoot: /www
   # logLevel: "info ssl:warn"
