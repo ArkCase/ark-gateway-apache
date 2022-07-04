@@ -199,16 +199,16 @@ def ensurePEMValid(value, asKey=False):
 	return os.path.realpath(path)
 
 def processModules(general, section):
-	print("Processing the module section from: %s" % (section))
+	print("Processing the module configurations")
 
 def processSites(general, section):
-	print("Processing the site section from: %s" % (section))
+	print("Processing the site configurations")
 
 def processConfs(general, section):
-	print("Processing the additional configuration section from: %s" % (section))
+	print("Processing the additional configurations")
 
 def renderSsl(general, ssl):
-	print("Processing the SSL section from: %s" % (ssl))
+	print("Processing the SSL configuration")
 	cert = ssl.get("cert")
 	key = ssl.get("key")
 
