@@ -9,6 +9,23 @@ ssl:
   #   - +FakeBasicAuth
   #   - +ExportCertData
   #   - +StrictRequire
+  # sections:
+  #   filesMatch: |
+  #     <FilesMatch "\.(cgi|shtml|phtml|php)$">
+  #       SSLOptions +StdEnvVars
+  #     </FilesMatch>
+  #   directory: |
+  #     <Directory /usr/lib/cgi-bin>
+  #       SSLOptions +StdEnvVars
+  #     </Directory>
+  #   browserMatch: |
+  #     BrowserMatch "MSIE [2-6]" \
+  #     nokeepalive ssl-unclean-shutdown \
+  #     downgrade-1.0 force-response-1.0
+  #   other: |
+  #     ... other sections that need to go here ...
+
+
   cert: certFile-or-base64
   key: certKeyFile-or-base64
   ca:
