@@ -1,4 +1,11 @@
 ssl:
+  cert: certFile-or-base64
+  key: certKeyFile-or-base64
+  ca:
+    - caFile-or-base64-1
+    - caFile-or-base64-2
+    # ...
+    - caFile-or-base64-N
   # serverAdmin: kaka@test
   # documentRoot: /www
   # logLevel: "info ssl:warn"
@@ -24,15 +31,6 @@ ssl:
   #     downgrade-1.0 force-response-1.0
   #   other: |
   #     ... other sections that need to go here ...
-
-
-  cert: certFile-or-base64
-  key: certKeyFile-or-base64
-  ca:
-    - caFile-or-base64-1
-    - caFile-or-base64-2
-    # ...
-    - caFile-or-base64-N
 
 modules:
   module-1: boolean
