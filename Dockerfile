@@ -9,6 +9,8 @@ ARG VER="1.0.0"
 ARG PKG="ark-gateway-apache"
 ARG SRC="${PKG}-${VER}.${OS}-${ARCH}"
 ARG UID="www-data"
+ARG GUCCI_VER="1.5.5"
+ARG GUCCI_SRC="https://github.com/noqcks/gucci/releases/download/${GUCCI_VER}/gucci-v${GUCCI_VER}-${OS}-${ARCH}"
 
 #
 # Some important labels
@@ -22,10 +24,13 @@ LABEL IMAGE_SOURCE="https://github.com/ArkCase/ark_gateway_apache"
 RUN apt-get update && apt-get -y dist-upgrade
 RUN apt-get install -y \
         apache2 \
+        curl \
         libapache2-mod-proxy-uwsgi \
-        python3-yaml
+        python3-yaml \
+        wget
 COPY "entrypoint" "reload" "/"
-COPY "reconfig" "/etc/apache2/reconfig"
+COPY "process-config.py" "reconfig" "/etc/apache2/"
+RUN curl -L -o /usr/local/bin/gucci "${GUCCI_SRC}" && chmod a+rx /usr/local/bin/gucci
 
 WORKDIR "/etc/apache2"
 

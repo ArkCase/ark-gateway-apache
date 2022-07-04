@@ -158,5 +158,5 @@ for key, label, function in sections:
 	except KeyError:
 		print("No %s configurations found in [%s]" % (label, CONFIG))
 
-print("Configuration applied per [%s]" % (CONFIG))
+print("Configurations applied per [%s]" % (CONFIG))
 sys.exit(0)
