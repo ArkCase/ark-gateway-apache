@@ -9,10 +9,12 @@
 import os
 #import pwd
 #import re
-#import shutil
+import shutil
 #import stat
+import ssl
+import subprocess
 import sys
-#import tempfile
+import tempfile
 #import time
 #import traceback
 
@@ -21,6 +23,19 @@ TYPE_STRING = type("")
 TYPE_DICT = type({})
 
 TRUE_VALUES = { "true" : True, "yes" : True, "y" : True, "1" : True, "on" : True, "enabled" : True, "enable" : True }
+
+OPENSSL_EXE = "/usr/bin/openssl"
+GUCCI_EXE = "/usr/local/bin/gucci"
+PATH_CERT = "/ssl/cert.pem"
+CERT_HEADER = "-----BEGIN CERTIFICATE-----"
+PATH_KEY = "/ssl/key.pem"
+KEY_HEADER = "-----BEGIN PRIVATE KEY-----"
+PATH_CA = "/ssl/ca.pem"
+PATH_CRL = "/ssl/crl.pem"
+SSL_TEMPLATE = "/etc/apache2/default-ssl.conf.tpl"
+SSL_TEMPLATE_TARGET = "/etc/apache2/sites-enabled/default-ssl.conf"
+
+SSL_GID = os.environ["SSL_GID"]
 
 #
 # Import the YAML library
@@ -60,6 +75,15 @@ try:
 		debug("WARNING: Dry run mode active")
 except KeyError:
 	# Do nothing - stick to the default value
+	pass
+
+class InvalidPEMFile(Exception):
+	pass
+
+class PathNotAbsolute(Exception):
+	pass
+
+class NotAFileError(Exception):
 	pass
 
 class InvalidModule(Exception):
@@ -129,8 +153,50 @@ finally:
 	if not isinstance(document, TYPE_STRING):
 		document.close()
 
-def processSsl(general, section):
-	print("Processing the SSL section from: %s" % (section))
+def ensurePEMValid(value, asKey=False):
+	# The value must either be a PEM-encoded certificate, or an
+	# absolute path to one
+	header = CERT_HEADER
+	if asKey:
+		header = KEY_HEADER
+
+	path = value
+	if value.strip().startswith(header):
+		# First things first, dump the contents into a temp file
+		(handle, path) = tempfile.mkstemp()
+		with os.fdopen(handle, "w") as out:
+			out.write(value)
+
+		try:
+			command = [OPENSSL_EXE, "x509", "-text", "-noout", "-in", path]
+			if asKey:
+				command = [OPENSSL_EXE, "rsa", "-in", path, "-check"]
+			subprocess.check_output(command)
+		except CalledProcessError as e:
+			# The file does not contain the PEM-encoded crap we seek. Thus, assume
+			# the given value MUST be a file, and thus delete the temporary file
+			os.remove(path)
+			objType = "certificate"
+			if asKey:
+				objType = "private key"
+			raise InvalidPEMFile("The given data does not contain a valid PEM-encoded %s (rc = %d):\n%s\n\n%s" % (objType, e.returncode, e.output, value))
+	else:
+		# This is not a certificate, so it's a path. It must be absolute, exist,
+		# refer to a regular file, and the file must be readable
+		if not os.path.isabs(path):
+			raise PathNotAbsoulte("The given path [%s] is not absolute" % (path))
+
+		if not os.path.exists(path):
+			raise FileNotFoundError("The file [%s] does not exist" % (path))
+
+		if not os.path.isfile(path):
+			raise NotAFileError("The path [%s] does not refer to a regular file" % (path))
+
+		if not os.access(path, os.R_OK):
+			raise PermissionError("The file [%s] is not readable" % (path))
+
+	# The file exists, is a regular file, and is readable
+	return os.path.realpath(path)
 
 def processModules(general, section):
 	print("Processing the module section from: %s" % (section))
@@ -141,11 +207,153 @@ def processSites(general, section):
 def processConfs(general, section):
 	print("Processing the additional configuration section from: %s" % (section))
 
+def renderSsl(general, ssl):
+	print("Processing the SSL section from: %s" % (ssl))
+	cert = ssl.get("cert")
+	key = ssl.get("key")
+
+	if cert and key:
+		# Ok we have a certificate and a key, so put them
+		# in /ssl/cert.pem and /ssl/key.pem respectively
+		try:
+			cert = ensurePEMValid(cert)
+			if cert != PATH_CERT:
+				shutil.copy(cert, PATH_CERT)
+		except Exception as e:
+			fail("The given certificate is not valid: %s" % (str(e)))
+
+		try:
+			key = ensurePEMValid(key, True)
+			if key != PATH_KEY:
+				shutil.copy(key, PATH_KEY)
+		except Exception as e:
+			fail("The given private key is not valid: %s" % (str(e)))
+	else:
+		# If not all the settings are given, we check to see if the
+		# default files exist, and use those automatically
+		hasCert = True
+		try:
+			if not cert:
+				cert = PATH_CERT
+			cert = ensurePEMValid(cert)
+			if cert != PATH_CERT:
+				shutil.copy(cert, PATH_CERT)
+		except FileNotFoundError:
+			# If the file isn't there, we're good so far
+			hasCert = False
+
+		hasKey = True
+		try:
+			if not key:
+				key = PATH_KEY
+			key = ensurePEMValid(key)
+			if key != PATH_KEY:
+				shutil.copy(key, PATH_KEY)
+		except FileNotFoundError:
+			# If the file isn't there, we're good so far
+			hasKey = False
+
+		# If we have one but not the other, we can't go on...
+		if hasCert != hasKey:
+			fail("Cannot configure SSL properly - you must provide both the certificate (/ssl/cert.pem) and key (/ssl/key.pem) files")
+
+		# Here we know either both are equally valid, or equally invalid
+		if not hasCert:
+			# If neither file exists, just ignore SSL configuration
+			print("No certificate information found - cannot configure SSL")
+			return
+
+	print("Certificate and Private Key are ready, setting the correct permissions")
+
+	# Set the correct permissions for the certificate
+	os.chmod(PATH_CERT, 0o644)
+	shutil.chown(PATH_CERT, "root", SSL_GID)
+
+	# Set the correct permissions for the private key
+	os.chmod(PATH_KEY, 0o640)
+	shutil.chown(PATH_KEY, "root", SSL_GID)
+
+	# Now compute the Certification Authorities
+	print("Rendering the CA lists into [%s]" % (PATH_CRL))
+	newCa = []
+	ca = ssl.get("ca")
+	if ca:
+		for v in ca:
+			newCa += [ensurePEMValid(v)]
+	ca = newCa
+	if len(ca) > 0:
+		(handle, outPath) = tempfile.mkstemp()
+		try:
+			with os.fdopen(handle, "w") as out:
+				for v in ca:
+					with open(v, 'r') as src:
+						for line in src:
+							out.write(line)
+		except Exception as e:
+			fail("Failed to concatenate the CA files from %s: %s" % (ca, str(e)))
+
+		# All is well, so copy the concatenated file into the target
+		shutil.move(outPath, PATH_CA)
+		os.chmod(PATH_CA, 0o644)
+		shutil.chown(PATH_CA, "root", SSL_GID)
+	else:
+		print("No CA list given, clearing out the existing one")
+		try:
+			os.remove(PATH_CA)
+		except FileNotFoundError:
+			pass
+
+	# Now compute the Certificate Revocation Lists
+	print("Rendering the CRL lists into [%s]" % (PATH_CRL))
+	newCrl = []
+	crl = ssl.get("crl")
+	if crl:
+		for v in crl:
+			newCrl += [ensurePEMValid(v)]
+	crl = newCrl
+	if len(crl) > 0:
+		(handle, outPath) = tempfile.mkstemp()
+		try:
+			with os.fdopen(handle, "w") as out:
+				for v in crl:
+					with open(v, 'r') as src:
+						for line in src:
+							out.write(line)
+		except Exception as e:
+			fail("Failed to concatenate the CRL files from %s: %s" % (ca, str(e)))
+
+		# All is well, so copy the concatenated file into the target
+		shutil.move(outPath, PATH_CRL)
+		os.chmod(PATH_CRL, 0o644)
+		shutil.chown(PATH_CRL, "root", SSL_GID)
+	else:
+		print("No CRL list given, clearing out the existing one")
+		try:
+			os.remove(PATH_CRL)
+		except FileNotFoundError:
+			pass
+
+	# Finally, render the SSL site template file
+	print("Rendering the SSL configuration into [%s]" % (SSL_TEMPLATE_TARGET))
+	try:
+		os.remove(SSL_TEMPLATE_TARGET)
+	except FileNotFoundError:
+		pass
+	(handle, outPath) = tempfile.mkstemp()
+	with os.fdopen(handle, "w") as out:
+		result = subprocess.run([GUCCI_EXE, "-o", "missingkey=zero", "-f", CONFIG, SSL_TEMPLATE], stdout=out)
+		if result.returncode != 0:
+			fail("Failed to render the SSL configuration template: %s" % (result.stderr))
+
+	os.chmod(outPath, 0o644)
+	shutil.chown(outPath, "root", "root")
+	shutil.move(outPath, SSL_TEMPLATE_TARGET)
+
 sections = []
-sections += [( "ssl",     "SSL",        processSsl     )]
 sections += [( "modules", "modules",    processModules )]
 sections += [( "sites",   "sites",      processSites   )]
 sections += [( "confs",   "additional", processConfs   )]
+sections += [( "ssl",     "SSL",        renderSsl     )]
 
 general = {}
 for key, label, function in sections:
