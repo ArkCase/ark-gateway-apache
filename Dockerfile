@@ -36,6 +36,7 @@ RUN usermod -a -G "${SSL_GID}" "${UID}"
 COPY "entrypoint" "reload" "/"
 COPY "process-config.py" "reconfig" "default-ssl.conf.tpl" "/etc/apache2/"
 RUN rm -f "/etc/apache2/sites-available/default-ssl.conf"
+RUN mkdir "/ssl" && chown "root:${SSL_GID}" "/ssl" && chmod 0750 "/ssl"
 
 WORKDIR "/etc/apache2"
 
