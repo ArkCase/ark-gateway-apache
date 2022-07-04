@@ -1,4 +1,14 @@
 ssl:
+  # serverAdmin: kaka@test
+  # documentRoot: /www
+  # logLevel: "info ssl:warn"
+  # client:
+  #   verify: require
+  #   depth: 10
+  # options:
+  #   - +FakeBasicAuth
+  #   - +ExportCertData
+  #   - +StrictRequire
   cert: certFile-or-base64
   key: certKeyFile-or-base64
   ca:
@@ -12,7 +22,7 @@ modules:
   module-2:
     enabled: boolean
     conf: |
-      contents of the module's conf
+      contents of the module's configuration
   # ...
   module-N: ...
 
@@ -21,7 +31,7 @@ sites:
   site-2:
     enabled: boolean
     conf: |
-      contents of the site
+      contents of the site configuration
   # ...
   site-N: ...
 
@@ -30,6 +40,6 @@ confs:
   conf-2:
     enabled: boolean
     conf: |
-      contents of the configuration
+      contents of the additional configuration
   # ...
   conf-N: ...

@@ -1,8 +1,8 @@
 <IfModule mod_ssl.c>
 	<VirtualHost _default_:443>
-		ServerAdmin {{ .ssl.serverAdmin | default "webmaster@localhost" }}
+		ServerAdmin {{ .ssl.serverAdmin | default "webmaster@localhost" | quote }}
 
-		DocumentRoot {{ .ssl.doocumentRoot | default "/var/www/html" }}
+		DocumentRoot {{ .ssl.documentRoot | default "/var/www/html" | quote }}
 
 		# Available loglevels: trace8, ..., trace1, debug, info, notice, warn,
 		# error, crit, alert, emerg.
@@ -33,7 +33,7 @@
 		#   /usr/share/doc/apache2/README.Debian.gz for more info.
 		#   If both key and certificate are stored in the same file, only the
 		#   SSLCertificateFile directive is needed.
-		SSLCertificateFile	/ssl/cert.pem
+		SSLCertificateFile    /ssl/cert.pem
 		SSLCertificateKeyFile /ssl/key.pem
 
 		#   Server Certificate Chain:
@@ -75,8 +75,8 @@
 		#   number which specifies how deeply to verify the certificate
 		#   issuer chain before deciding the certificate is not valid.
 		{{- if .ssl.client }}
-		SSLVerifyClient {{ ssl.client.verify | default "require" }}
-		SSLVerifyDepth  {{ int (ssl.client.depth | default "10") }}
+		SSLVerifyClient {{ .ssl.client.verify | default "require" }}
+		SSLVerifyDepth  {{ int (.ssl.client.depth | default "10") }}
 		{{- else }}
 		#SSLVerifyClient require
 		#SSLVerifyDepth  10
