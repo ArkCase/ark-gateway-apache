@@ -28,9 +28,9 @@ RUN apt-get install -y \
         libapache2-mod-proxy-uwsgi \
         python3-yaml \
         wget
-COPY "entrypoint" "reload" "/"
-COPY "process-config.py" "reconfig" "/etc/apache2/"
 RUN curl -L -o /usr/local/bin/gucci "${GUCCI_SRC}" && chmod a+rx /usr/local/bin/gucci
+COPY "entrypoint" "reload" "/"
+COPY "process-config.py" "reconfig" "default-ssl.conf.tpl" "/etc/apache2/"
 
 WORKDIR "/etc/apache2"
 
