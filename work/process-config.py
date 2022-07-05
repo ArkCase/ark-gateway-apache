@@ -69,6 +69,10 @@ SSL_TEMPLATE_TARGET = "default-ssl.conf"
 SSL_TEMPLATE = TEMPLATE_DIR + "/" + SSL_TEMPLATE_TARGET + ".tpl"
 SSL_TEMPLATE_TARGET = SITES_ENABLED + "/" + SSL_TEMPLATE_TARGET
 
+ENV_TEMPLATE_TARGET = "envvars"
+ENV_TEMPLATE = TEMPLATE_DIR + "/" + ENV_TEMPLATE_TARGET + ".tpl"
+ENV_TEMPLATE_TARGET = WORK_DIR + "/" + ENV_TEMPLATE_TARGET
+
 MAIN_TEMPLATE_TARGET = "apache2.conf"
 MAIN_TEMPLATE = TEMPLATE_DIR + "/" + MAIN_TEMPLATE_TARGET + ".tpl"
 MAIN_TEMPLATE_TARGET = WORK_DIR + "/" + MAIN_TEMPLATE_TARGET
@@ -585,6 +589,7 @@ def renderSsl(general, ssl):
 def renderMain(general, ssl):
 	renderTemplate("main", MAIN_TEMPLATE, MAIN_TEMPLATE_TARGET, "root", "root", 0o644)
 	renderTemplate("website", MAIN_WEB_TEMPLATE, MAIN_WEB_TEMPLATE_TARGET, "root", "root", 0o644)
+	renderTemplate("environment", ENV_TEMPLATE, ENV_TEMPLATE_TARGET, "root", "root", 0o644)
 
 sections = []
 sections += [( "modules", "modules",    processModules, clearModules )]
