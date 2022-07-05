@@ -1,0 +1,129 @@
+main:
+  # serverRoot: "/var/www/www"
+
+ssl:
+  cert: inc:examples/cert.pem
+  key: inc:examples/key.pem
+  ca:
+    - inc:examples/ca.1
+    - |
+      -----BEGIN CERTIFICATE-----
+      MIIFQjCCBCqgAwIBAgIBEjANBgkqhkiG9w0BAQsFADCBtzELMAkGA1UEBhMCQ1Ix
+      ETAPBgNVBAgTCFNhbiBKb3NlMRIwEAYDVQQHEwlTYW50YSBBbmExFzAVBgNVBAoT
+      DkVydWRpY2l0eSBTLkEuMRwwGgYDVQQLExNTZWN1cml0eSBPcGVyYXRpb25zMSMw
+      IQYDVQQDExpFcnVkaWNpdHkgMjA0OC1iaXQgUm9vdCBDQTElMCMGCSqGSIb3DQEJ
+      ARYWc2VjdXJpdHlAZXJ1ZGljaXR5LmNvbTAeFw0yMDA3MTUyMjMwNDRaFw0zMDA3
+      MTMyMjMwNDRaMIGZMQswCQYDVQQGEwJDUjERMA8GA1UECBMIU2FuIEpvc2UxFzAV
+      BgNVBAoTDkVydWRpY2l0eSBTLkEuMRwwGgYDVQQLExNTZWN1cml0eSBPcGVyYXRp
+      b25zMRkwFwYDVQQDExBkaWVnby5yaXZlcmEucHJ2MSUwIwYJKoZIhvcNAQkBFhZz
+      ZWN1cml0eUBlcnVkaWNpdHkuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
+      CgKCAQEApQRdDGKWjYNLBFTpByW1qlnMz8bdHOfPrRfJFFS4M/jpgBb0wiktiTyj
+      7Rks/kuMje0VRlOykQEXOI91TPLZLMC4jraiZ63NEiRTT3QrxrfcqSIH5vCKSdA8
+      NkrS9LFaO5iafXERotiQMIYzxBai93c1Qq286v3BPTOHQpBGohXToFF40zfINddO
+      Pm8KJuxbJWyCnIDta32XCjG3IDUVklZgqX2iLshr/mckY57wDmZOndvbSaVyg13s
+      GadzxQpJ6u2YWZZxZq3ZIV6oqF/PhvPDFS/jq7FQgmfKh67OsIBJuJfHSJhrMh83
+      YsToNcscZWXL9z8bqDOj3oOktAIctQIDAQABo4IBczCCAW8wCQYDVR0TBAIwADAs
+      BglghkgBhvhCAQ0EHxYdT3BlblNTTCBHZW5lcmF0ZWQgQ2VydGlmaWNhdGUwHQYD
+      VR0OBBYEFHs4ocuvJ4Yqm5/3DiqsGkcJ40xFMIH3BgNVHSMEge8wgeyAFAvWsA/U
+      tLnlxg44/mmBUjcGXoXsoYG9pIG6MIG3MQswCQYDVQQGEwJDUjERMA8GA1UECBMI
+      U2FuIEpvc2UxEjAQBgNVBAcTCVNhbnRhIEFuYTEXMBUGA1UEChMORXJ1ZGljaXR5
+      IFMuQS4xHDAaBgNVBAsTE1NlY3VyaXR5IE9wZXJhdGlvbnMxIzAhBgNVBAMTGkVy
+      dWRpY2l0eSAyMDQ4LWJpdCBSb290IENBMSUwIwYJKoZIhvcNAQkBFhZzZWN1cml0
+      eUBlcnVkaWNpdHkuY29tghRKGa+dWSEQ5dbjKBFBvpznkkKKHDAbBgNVHREEFDAS
+      ghBkaWVnby5yaXZlcmEucHJ2MA0GCSqGSIb3DQEBCwUAA4IBAQBljFxOAOgYaqbk
+      /3GCXhLxFxtEeDImUkywfPkoeuwauanqIU4I5Ba/BH3xd2Syn70Kt0PY6457bl5Q
+      IqhW0nmfUz1Ae2tmNryBBCcWfn+iw6Gi8dvcD0Ye2LJCcUqaph5KLgcV5lI16pBq
+      ZVZSG0Rc4KBuqxe9pdedysu4AT1dhqAuqzUUGc0gGOniFIgNUuFyMGrQWmpZ8eZl
+      DyoOqTwmFPeKNa31eS2bEp4FWM2QEythetrfL0FakGeZ2czkZy6AKJNoo2sUbnGB
+      u/FTrXGbo4CM7pNEPfQyILPNv/iN8eCR19ZeeZEWvKu9NCJJ5tCtDPr3ZZqVDd03
+      Wqj5ONAY
+      -----END CERTIFICATE-----
+
+  crl:
+    - inc:examples/crl.1
+    - inc:examples/crl.2
+    # ...
+    - |
+      -----BEGIN CERTIFICATE-----
+      MIIFOjCCBCKgAwIBAgIBGTANBgkqhkiG9w0BAQsFADCBtzELMAkGA1UEBhMCQ1Ix
+      ETAPBgNVBAgTCFNhbiBKb3NlMRIwEAYDVQQHEwlTYW50YSBBbmExFzAVBgNVBAoT
+      DkVydWRpY2l0eSBTLkEuMRwwGgYDVQQLExNTZWN1cml0eSBPcGVyYXRpb25zMSMw
+      IQYDVQQDExpFcnVkaWNpdHkgMjA0OC1iaXQgUm9vdCBDQTElMCMGCSqGSIb3DQEJ
+      ARYWc2VjdXJpdHlAZXJ1ZGljaXR5LmNvbTAeFw0yMDA3MTYwMDQ0NTdaFw0zMDA3
+      MTQwMDQ0NTdaMIGVMQswCQYDVQQGEwJDUjERMA8GA1UECBMIU2FuIEpvc2UxFzAV
+      BgNVBAoTDkVydWRpY2l0eSBTLkEuMRwwGgYDVQQLExNTZWN1cml0eSBPcGVyYXRp
+      b25zMRUwEwYDVQQDFAwqLnJpdmVyYS5wcnYxJTAjBgkqhkiG9w0BCQEWFnNlY3Vy
+      aXR5QGVydWRpY2l0eS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIB
+      AQDUSAQz2xHVbg1l3LEUF2C7xkG0YGhZdGjiundvMShOA/V6k996kQFyJIhptD9L
+      SdIH3TyWL5oh5cljla12+u2f5Mq9G1zMBg6NBa0Eu2WJHe1B/GEryL3sPM5smAS4
+      s+cI6CAayG3quH3buUiVzTD5k06lExXZF64JZYXdQkXSbn1PJsElTXIGHyaCw8b8
+      sdjyeP7D6Oc4i1XmvjJsCz7CB9Si4D/Xd53NipseAzNig7xjNDYopr3H0ou5aU7s
+      zhCSDTwsLkTlsDLTXro5hIEe6TX/kyvCvuoU+gLVMx8hTC559kN4X+lmnL5/PTVW
+      9Po6NN5p7GyFg2a0mEf/lzNZAgMBAAGjggFvMIIBazAJBgNVHRMEAjAAMCwGCWCG
+      SAGG+EIBDQQfFh1PcGVuU1NMIEdlbmVyYXRlZCBDZXJ0aWZpY2F0ZTAdBgNVHQ4E
+      FgQUXfJguaRy6HTzP1I9gqSTKySDXBYwgfcGA1UdIwSB7zCB7IAUC9awD9S0ueXG
+      Djj+aYFSNwZeheyhgb2kgbowgbcxCzAJBgNVBAYTAkNSMREwDwYDVQQIEwhTYW4g
+      Sm9zZTESMBAGA1UEBxMJU2FudGEgQW5hMRcwFQYDVQQKEw5FcnVkaWNpdHkgUy5B
+      LjEcMBoGA1UECxMTU2VjdXJpdHkgT3BlcmF0aW9uczEjMCEGA1UEAxMaRXJ1ZGlj
+      aXR5IDIwNDgtYml0IFJvb3QgQ0ExJTAjBgkqhkiG9w0BCQEWFnNlY3VyaXR5QGVy
+      dWRpY2l0eS5jb22CFEoZr51ZIRDl1uMoEUG+nOeSQoocMBcGA1UdEQQQMA6CDCou
+      cml2ZXJhLnBydjANBgkqhkiG9w0BAQsFAAOCAQEAdgP+VPcQq1kbD3EOIbpNKaUD
+      BiYCis1WRUD3NMGjilhxQvAJaspjwume+RNff7H0cAPhNpUAiTcqjRYbEgi2j2Yf
+      pu9OaX92/ofeg5G7VP/40H2FJTkxliXaJ34k0LBX7XJYZbn6d4z46Xj77gcM3np5
+      T1wLFSVU/EG2IZOMHYeJzzpDvElwtPTxU0pdlXJc1zFoajpURSCvAcyKwR2OHsTU
+      vLfeYSkkvLmZNE0zsWfDVosdpuZlmLS9ulI9XW3UPdVT+Aq+Cjt5nqHm0RBbDXhG
+      WTm/uHMSpJQUKRG+HwPn6hMsAtGgJ7MBAOkMhv6W66LMkcuqe5bR+gi0p6EmIw==
+      -----END CERTIFICATE-----
+
+  # serverAdmin: kaka@test
+  # documentRoot: /www
+  # logLevel: "info ssl:warn"
+  # client:
+  #   verify: require
+  #   depth: 10
+  # options:
+  #   - +FakeBasicAuth
+  #   - +ExportCertData
+  #   - +StrictRequire
+  # sections:
+  #   filesMatch: |
+  #     <FilesMatch "\.(cgi|shtml|phtml|php)$">
+  #       SSLOptions +StdEnvVars
+  #     </FilesMatch>
+  #   directory: |
+  #     <Directory /usr/lib/cgi-bin>
+  #       SSLOptions +StdEnvVars
+  #     </Directory>
+  #   browserMatch: |
+  #     BrowserMatch "MSIE [2-6]" \
+  #     nokeepalive ssl-unclean-shutdown \
+  #     downgrade-1.0 force-response-1.0
+  #   other: |
+  #     ... other sections that need to go here ...
+
+modules:
+  module-1: boolean
+  module-2:
+    enabled: boolean
+    conf: |
+      contents of the module's configuration
+  # ...
+  module-N: ...
+
+sites:
+  site-1: boolean
+  site-2:
+    enabled: boolean
+    conf: |
+      contents of the site configuration
+  # ...
+  site-N: ...
+
+confs:
+  conf-1: boolean
+  conf-2:
+    enabled: boolean
+    conf: |
+      contents of the additional configuration
+  # ...
+  conf-N: ...
