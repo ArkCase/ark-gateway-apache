@@ -16,7 +16,7 @@ import subprocess
 import sys
 import tempfile
 #import time
-#import traceback
+import traceback
 
 TYPE_LIST = type([])
 TYPE_STRING = type("")
@@ -28,17 +28,23 @@ FALSE_VALUES = dict.fromkeys(["false", "no",  "n", "0", "off", "disabled", "disa
 # First things first: create the directory where this configuration will be stored, and
 # extract the template TAR file onto it.
 
+APACHE2CTL_EXE = "/usr/sbin/apache2ctl"
+GUCCI_EXE = "/usr/local/bin/gucci"
+OPENSSL_EXE = "/usr/bin/openssl"
+TAR_EXE = "/usr/bin/tar"
+
 TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-WORK_TMP = "/work/.tmp"
-WORK_DIR = tempfile.mkdtemp(prefix="apache2." + TIMESTAMP, dir=WORK_TMP)
-TEMPLATE_DIR = WORK_DIR + "/ssl"
+CONF_DIR = "/conf"
+BACKUP_DIR = CONF_DIR + "/.backups"
 
-CONF_EXT = "/conf/ext"
+WORK_ROOT = "/work"
+WORK_TMP = WORK_ROOT + "/.tmp"
+TEMPLATE_DIR = WORK_ROOT + "/templates"
+DEFAULTS_TAR_GZ = WORK_ROOT + "/defaults.tar.gz"
+WORK_DIR = tempfile.mkdtemp(prefix="apache2." + TIMESTAMP + ".", dir=WORK_TMP)
 
-OPENSSL_EXE = "/usr/bin/openssl"
-GUCCI_EXE = "/usr/local/bin/gucci"
-APACHE2CTL_EXE = "/usr/sbin/apache2ctl"
+APACHE_DIR = "/etc/apache2"
 
 SSL_GID = os.environ["SSL_GID"]
 SSL_DIR = WORK_DIR + "/ssl"
@@ -47,8 +53,6 @@ PATH_CERT = SSL_DIR + "/cert.pem"
 PATH_KEY = SSL_DIR + "/key.pem"
 PATH_CA = SSL_DIR + "/ca.pem"
 PATH_CRL = SSL_DIR + "/crl.pem"
-
-APACHE_DIR = "/etc/apache2"
 
 CONF_AVAILABLE = WORK_DIR + "/conf-available"
 CONF_ENABLED = WORK_DIR + "/conf-enabled"
@@ -66,7 +70,7 @@ MAIN_TEMPLATE = TEMPLATE_DIR + "/apache2.conf.tpl"
 MAIN_TEMPLATE_TARGET = WORK_DIR + "/apache2.conf"
 
 MAIN_WEB_TEMPLATE = TEMPLATE_DIR + "/apache2.conf.tpl"
-MAIN_WEB_TEMPLATE_TARGET = WORK_DIR + "/000-default.conf"
+MAIN_WEB_TEMPLATE_TARGET = SITES_ENABLED + "/000-default.conf"
 
 INC_PARSER = re.compile("^inc:(.+)$")
 
@@ -84,9 +88,7 @@ except ImportError:
 #
 DEBUG = False
 try:
-	d = os.environ["DEBUG"].lower()
-	if TRUE_VALUES.get(d):
-		DEBUG = True
+	DEBUG = TRUE_VALUES.get(os.environ["DEBUG"].lower())
 except KeyError:
 	# Do nothing - stick to the default value
 	pass
@@ -95,6 +97,11 @@ def debug(msg, *args):
 	if not DEBUG:
 		return None
 	print(msg % args)
+
+def strExc(e):
+	if DEBUG:
+		return traceback.format_exc(e)
+	return str(e)
 
 #
 # Set the dry run mode
@@ -162,7 +169,7 @@ if not os.path.isfile(CONFIG):
 try:
 	document = open(CONFIG)
 except Exception as e:
-	fail("Failed to open the configuration from [%s]: %s" % (CONFIG, str(e)))
+	fail("Failed to open the configuration from [%s]: %s" % (CONFIG, strExc(e)))
 
 try:
 	yamlData = load(document, Loader=Loader)
@@ -179,7 +186,7 @@ except Exception as e:
 		mark = e.problem_mark
 		msg = "YAML syntax error in the configuration data at line %s, column %s of [%s]" % (mark.line + 1, mark.column + 1, CONFIG)
 	else:
-		msg = "Failed to parse the YAML data from [%s]" % (str(e), CONFIG)
+		msg = "Failed to parse the YAML data from [%s]" % (strExc(e), CONFIG)
 	fail(msg)
 finally:
 	# Clean up if necessary
@@ -189,7 +196,7 @@ finally:
 def testConfig(directory):
 	try:
 		subprocess.check_output([APACHE2CTL_EXE, "-t", "-d", directory])
-	except CalledProcessError as e:
+	except subprocess.CalledProcessError as e:
 		raise InvalidConfig(str(e.output))
 
 def copyToTemp(src):
@@ -209,7 +216,7 @@ def writeToFile(data, target=None, mode=None, user=None, group=None):
 			with os.fdopen(handle, "w") as out:
 				out.write(data)
 		else:
-			with os.open(target, "w") as out:
+			with open(target, "w") as out:
 				out.write(data)
 	except Exception as e:
 		try:
@@ -271,7 +278,7 @@ def copyOrCreate(value, target=None, mode=None, user=None, group=None):
 
 		# Make sure the path never overflows
 		path = os.path.normpath("/" + path)[1:]
-		path = CONF_EXT + "/" + path
+		path = CONF_DIR + "/" + path
 
 		# The path must exist, refer to a regualr file, and the file
 		# must be readable.
@@ -309,7 +316,7 @@ def ensurePEMValid(value, target=None, asKey=False, mode=None, user=None, group=
 		if asKey:
 			command = [OPENSSL_EXE, "rsa", "-in", info["path"], "-check"]
 		subprocess.check_output(command)
-	except CalledProcessError as e:
+	except subprocess.CalledProcessError as e:
 		# The file does not contain the PEM-encoded crap we seek. Thus, assume
 		# the given value MUST be a file, and thus delete the temporary file
 		if info["included"]:
@@ -449,17 +456,55 @@ def processLinkDirectory(general, name, data, available, enabled, mainExt, extra
 	print("includes for %s: %s" % (name, str(includes)))
 	print("generations for %s: %s" % (name, str(generations)))
 
+def clearLinkDirectory(general, label, directory):
+	print("Clearing the %s directory at [%s]" % (label, directory))
+	for f in os.listdir(directory):
+		p = os.path.join(directory, f)
+		if os.path.isfile(file_path) or os.path.islink(file_path):
+			os.unlink(file_path)
+		elif os.path.isdir(file_path):
+			shutil.rmtree(file_path)
+
+def clearModules(general):
+	return clearLinkDirectory(general, "module", MODS_ENABLED)
+
 def processModules(general, modules):
 	print("Processing the module configurations")
 	return processLinkDirectory(general, "modules", modules, MODS_AVAILABLE, MODS_ENABLED, "conf", "load", True)
+
+def clearSites(general):
+	return clearLinkDirectory(general, "site", MODS_ENABLED)
 
 def processSites(general, sites):
 	print("Processing the site configurations")
 	return processLinkDirectory(general, "sites", sites, SITES_AVAILABLE, SITES_ENABLED, "conf", [])
 
+def clearConfs(general):
+	return clearLinkDirectory(general, "additional", MODS_ENABLED)
+
 def processConfs(general, confs):
 	print("Processing the additional configurations")
 	return processLinkDirectory(general, "confs", confs, CONF_AVAILABLE, CONF_ENABLED, "conf", [])
+
+def renderTemplate(label, template, target, user=None, group=None, mode=None):
+	print("Rendering the %s configuration into [%s]" % (label, target))
+	try:
+		os.remove(target)
+	except FileNotFoundError:
+		pass
+
+	with open(target, "w") as out:
+		result = subprocess.run([GUCCI_EXE, "-o", "missingkey=zero", "-f", CONFIG, template], stdout=out)
+		if result.returncode != 0:
+			fail("Failed to render the %s configuration template: %s" % (label, result.stderr))
+
+	if mode:
+		os.chmod(target, mode)
+
+	if user or group:
+		shutil.chown(target, user, group)
+
+	return target
 
 def renderSsl(general, ssl):
 	print("Processing the SSL configuration")
@@ -473,17 +518,21 @@ def renderSsl(general, ssl):
 	if not cert or not key:
 		fail("Cannot configure SSL properly - you must provide both the certificate and key files or data")
 
+	if not os.path.exists(SSL_DIR):
+		os.mkdir(SSL_DIR, mode=0o750)
+		shutil.chown(SSL_DIR, "root", SSL_GID)
+
 	# Ok we have a certificate and a key, so put them
 	# in PATH_CERT and PATH_KEY respectively
 	try:
 		ensurePEMValid(cert, PATH_CERT, mode=0o644, user="root", group=SSL_GID)
 	except Exception as e:
-		fail("The given certificate is not valid: %s" % (str(e)))
+		fail("The given certificate is not valid: %s" % (strExc(e)))
 
 	try:
 		ensurePEMValid(key, PATH_KEY, True, mode=0o640, user="root", group=SSL_GID)
 	except Exception as e:
-		fail("The given private key is not valid: %s" % (str(e)))
+		fail("The given private key is not valid: %s" % (strExc(e)))
 
 	# Now compute the Certification Authorities
 	print("Rendering the CA lists into [%s]" % (PATH_CRL))
@@ -497,7 +546,7 @@ def renderSsl(general, ssl):
 		try:
 			concatToTarget(ca, PATH_CA, user="root", group=SSL_GID, mode=0o644)
 		except Exception as e:
-			fail("Failed to concatenate the CA files from %s: %s" % (ca, str(e)))
+			fail("Failed to concatenate the CA files from %s: %s" % (ca, strExc(e)))
 	else:
 		print("No CA list given, clearing out the existing one")
 		try:
@@ -517,7 +566,7 @@ def renderSsl(general, ssl):
 		try:
 			concatToTarget(crl, PATH_CRL, user="root", group=SSL_GID, mode=0o644)
 		except Exception as e:
-			fail("Failed to concatenate the CRL files from %s: %s" % (ca, str(e)))
+			fail("Failed to concatenate the CRL files from %s: %s" % (ca, strExc(e)))
 	else:
 		print("No CRL list given, clearing out the existing one")
 		try:
@@ -525,41 +574,61 @@ def renderSsl(general, ssl):
 		except FileNotFoundError:
 			pass
 
-	# Finally, render the SSL site template file
-	print("Rendering the SSL configuration into [%s]" % (SSL_TEMPLATE_TARGET))
-	try:
-		os.remove(SSL_TEMPLATE_TARGET)
-	except FileNotFoundError:
-		pass
+	renderTemplate("SSL", SSL_TEMPLATE, SSL_TEMPLATE_TARGET, "root", "root", 0o644)
 
-	(handle, outPath) = tempfile.mkstemp()
-	with os.fdopen(handle, "w") as out:
-		result = subprocess.run([GUCCI_EXE, "-o", "missingkey=zero", "-f", CONFIG, SSL_TEMPLATE], stdout=out)
-		if result.returncode != 0:
-			fail("Failed to render the SSL configuration template: %s" % (result.stderr))
-
-	os.chmod(outPath, 0o644)
-	shutil.chown(outPath, "root", "root")
-	shutil.move(outPath, SSL_TEMPLATE_TARGET)
+def renderMain(general, ssl):
+	renderTemplate("main", MAIN_TEMPLATE, MAIN_TEMPLATE_TARGET, "root", "root", 0o644)
+	renderTemplate("website", MAIN_WEB_TEMPLATE, MAIN_WEB_TEMPLATE_TARGET, "root", "root", 0o644)
 
 sections = []
-sections += [( "modules", "modules",    processModules )]
-sections += [( "sites",   "sites",      processSites   )]
-sections += [( "confs",   "additional", processConfs   )]
-sections += [( "ssl",     "SSL",        renderSsl      )]
-sections += [( "main",    "main",       renderMain     )]
+sections += [( "modules", "modules",    processModules, clearModules )]
+sections += [( "sites",   "sites",      processSites,   clearSites   )]
+sections += [( "confs",   "additional", processConfs,   clearConfs   )]
+sections += [( "ssl",     "SSL",        renderSsl,      None         )]
+sections += [( "main",    "main",       renderMain,     None         )]
+
+# First things first - extract the TAR file into the work directory
+try:
+	subprocess.check_output([TAR_EXE, "-C", WORK_DIR, "-xzvf", DEFAULTS_TAR_GZ])
+except subprocess.CalledProcessError as e:
+	fail("Failed to extract the configuration defaults (rc = %d): %s" % (e.returncode, e.output))
 
 general = {}
 work = {}
-for key, label, function in sections:
+for key, label, processor, clearer in sections:
 	try:
 		data = yamlData[key]
+		clear = data.pop("clearDefaults", "false")
+		if TRUE_VALUES.get(str(clear).lower()) and clearer:
+			clearer(general)
+
 		try:
-			work[key] = { "label" : label, function(general, data) }
+			work[key] = { "label" : label, "result" : processor(general, data) }
 		except Exception as e:
-			fail("Failed to process the %s configurations from [%s]: %s" % (label, CONFIG, str(e)))
+			fail("Failed to process the %s configurations from [%s]: %s" % (label, CONFIG, strExc(e)))
+
 	except KeyError:
 		print("No %s configurations found in [%s]" % (label, CONFIG))
 
 print("Configurations applied per [%s]" % (CONFIG))
+
+# Now, validate the configurations
+try:
+	testConfig(WORK_DIR)
+except InvalidConfig as e:
+	fail("The configuration was applied successfully, but Apache did not validate it:\n%s" % (strExc(e)))
+
+print("Configurations successfully verified!")
+WORK_DIR = os.path.realpath(WORK_DIR)
+if os.path.exists(APACHE_DIR):
+	try:
+		os.remove(APACHE_DIR)
+	except FileNotFoundError:
+		pass
+
+shutil.copytree(WORK_DIR, APACHE_DIR)
+print("Configurations successfully deployed!")
+backup = BACKUP_DIR + "/config.yaml." + TIMESTAMP
+shutil.copy(CONFIG, backup)
+print("Configurations successfully stored for backup as [%s]!" % (backup))
 sys.exit(0)
