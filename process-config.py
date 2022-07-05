@@ -8,7 +8,7 @@
 #import grp
 import os
 #import pwd
-#import re
+import re
 import shutil
 #import stat
 import ssl
@@ -22,20 +22,37 @@ TYPE_LIST = type([])
 TYPE_STRING = type("")
 TYPE_DICT = type({})
 
-TRUE_VALUES = { "true" : True, "yes" : True, "y" : True, "1" : True, "on" : True, "enabled" : True, "enable" : True }
+TRUE_VALUES  = dict.fromkeys(["true",  "yes", "y", "1", "on",  "enabled",  "enable" ], True)
+FALSE_VALUES = dict.fromkeys(["false", "no",  "n", "0", "off", "disabled", "disable"], False)
 
 OPENSSL_EXE = "/usr/bin/openssl"
 GUCCI_EXE = "/usr/local/bin/gucci"
-PATH_CERT = "/ssl/cert.pem"
-CERT_HEADER = "-----BEGIN CERTIFICATE-----"
-PATH_KEY = "/ssl/key.pem"
-KEY_HEADER = "-----BEGIN PRIVATE KEY-----"
-PATH_CA = "/ssl/ca.pem"
-PATH_CRL = "/ssl/crl.pem"
-SSL_TEMPLATE = "/etc/apache2/default-ssl.conf.tpl"
-SSL_TEMPLATE_TARGET = "/etc/apache2/sites-enabled/default-ssl.conf"
 
 SSL_GID = os.environ["SSL_GID"]
+SSL_DIR = "/ssl"
+
+PATH_CERT = SSL_DIR + "/cert.pem"
+CERT_HEADER = "-----BEGIN CERTIFICATE-----"
+PATH_KEY = SSL_DIR + "/key.pem"
+KEY_HEADER = "-----BEGIN PRIVATE KEY-----"
+PATH_CA = SSL_DIR + "/ca.pem"
+PATH_CRL = SSL_DIR + "/crl.pem"
+
+APACHE_DIR = "/etc/apache2"
+
+CONF_AVAILABLE = APACHE_DIR + "/conf-available"
+CONF_ENABLED = APACHE_DIR + "/conf-enabled"
+
+MODS_AVAILABLE = APACHE_DIR + "/mods-available"
+MODS_ENABLED = APACHE_DIR + "/mods-enabled"
+
+SITES_AVAILABLE = APACHE_DIR + "/sites-available"
+SITES_ENABLED = APACHE_DIR + "/sites-enabled"
+
+SSL_TEMPLATE = APACHE_DIR + "/default-ssl.conf.tpl"
+SSL_TEMPLATE_TARGET = SITES_ENABLED + "/default-ssl.conf"
+
+INC_PARSER = re.compile("^inc:(/.+)$")
 
 #
 # Import the YAML library
@@ -198,14 +215,138 @@ def ensurePEMValid(value, asKey=False):
 	# The file exists, is a regular file, and is readable
 	return os.path.realpath(path)
 
-def processModules(general, section):
+def listAvailable(src, ext):
+	if not ext or not src:
+		return []
+
+	if not isinstance(ext, TYPE_LIST):
+		ext = str(ext).split(",")
+
+	ret = []
+	for f in os.listdir(src):
+		p = src + "/" + f
+		if os.path.isfile(p):
+			for e in ext:
+				e = "." + e
+				if f.endswith(e):
+					ret += [f.removesuffix(e)]
+
+	ret = list(set(ret))
+	ret.sort()
+	return ret
+
+def processLinkDirectory(general, name, data, available, enabled, mainExt, extraExt = [], extraRequired = False):
+	# First things first - make sure that the requested configuration is viable
+	# available = dict.fromkeys(listAvailable(available, extensions), True)
+	reqMain = dict.fromkeys(listAvailable(available, mainExt), True)
+	reqExtra = dict.fromkeys(listAvailable(available, extraExt), True)
+
+	missing = []
+	simpleLinks = []
+	includes = {}
+	generations = {}
+	for key in data:
+		value = data[key]
+
+		# First things first: is this value a string?
+		if isinstance(value, TYPE_STRING):
+			# Is this a boolean-value?
+			if TRUE_VALUES.get(value.lower()):
+				# This is a boolean-value, so stow it to create the link(s)
+				# to the available file(s) into the target as needed
+				simpleLinks += [key]
+				continue
+
+			# Is it an include?
+			m = INC_PARSER.match(value)
+			if m:
+				# It's an include! Validate that the path exists,
+				# and refers to a regular file that is readable,
+				# and stow it for inclusion into the target
+				includes[key] = { mainExt : m.group(1) }
+				continue
+
+			# This must be the contents of the main file, so
+			# stow it for storage into the target
+			generations[key] = { mainExt : value }
+			continue
+
+		# If it's a dictionary, then it must be the "longform" structure
+		if isinstance(value, TYPE_DICT):
+
+			# First things first: is it enabled?
+			enabled = value.pop("enabled", "true")
+			enabled = TRUE_VALUES.get(str(enabled).lower())
+
+			# If it's not enabled, simply skip it and do nothing
+			if not enabled:
+				continue
+
+			# It's enabled, so process the contents
+			files = values.get("files")
+			if files is None:
+				# No files defined, so treat it as a simple include
+				simpleLinks += [key]
+				continue
+
+			if not isinstance(files, TYPE_DICT):
+				fail("The 'files:' sections must be dictionaries whose keys are the files' extensions to be created (%s %s)" % (name, key))
+
+			# We have files to create, so stow them for creation
+			for ext in files:
+				value = str(files[ext])
+
+				# Is it an include?
+				m = INC_PARSER.match(value)
+				if m:
+					# It's an include! Validate that the path exists,
+					# and refers to a regular file that is readable,
+					# and stow it for inclusion into the target
+					includes[key] = { ext : m.group(1) }
+					continue
+
+				# This must be the contents of the main file, so
+				# stow it for storage into the target
+				generations[key] = { ext : value }
+				continue
+
+			continue
+
+		fail("Invalid format for the %s.%s section - wasn't a string, nor the longform dict" % (name, key))
+
+	# Ok, so at this point...
+	#   * simpleLinks contains the list of names for whom all files will just be
+	#     linked from available into enabled. Missing sources are an error
+	#
+	#   * includes contains a dict whose keys are the name of the object to be
+	#     created/linked, and the value is a dict whose keys are the file extensions
+	#     to be created, with the value being the file whose contents should be stored there.
+	#     If there's a missing extension from the ones listed, then a simple link must be possible
+	#     from available into enabled. Missing sources are an error
+	#
+	#   * generations contains a dict whose keys are the name of the object to be
+	#     created, and the value is a dict whose keys are the file extensions
+	#     to be created, with the value being the contents of the files that need creating.
+	#     If there's a missing extension from the ones listed, then a simple link must be possible
+	#     from available into enabled. Missing sources are an error
+	#
+	# The next step is to validate that all these operations would succeed, and start accumulating the lambdas
+	# that will perform the actual work at the very end once the entire configuration is validated
+	print("simpleLinks for %s: %s" % (name, str(simpleLinks)))
+	print("includes for %s: %s" % (name, str(includes)))
+	print("generations for %s: %s" % (name, str(generations)))
+
+def processModules(general, modules):
 	print("Processing the module configurations")
+	return processLinkDirectory(general, "modules", modules, MODS_AVAILABLE, MODS_ENABLED, "conf", "load", True)
 
-def processSites(general, section):
+def processSites(general, sites):
 	print("Processing the site configurations")
+	return processLinkDirectory(general, "sites", sites, SITES_AVAILABLE, SITES_ENABLED, "conf", [])
 
-def processConfs(general, section):
+def processConfs(general, confs):
 	print("Processing the additional configurations")
+	return processLinkDirectory(general, "confs", confs, CONF_AVAILABLE, CONF_ENABLED, "conf", [])
 
 def renderSsl(general, ssl):
 	print("Processing the SSL configuration")

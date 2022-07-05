@@ -38,28 +38,37 @@ ssl:
   #     ... other sections that need to go here ...
 
 modules:
-  module-1: boolean
+  # If using inc:${absolutePath} here, then the contents will be used for the .conf file.
+  # Must use the other syntax to provide the contents of both files
+  module-1: boolean-or-inc:${absolutePath}
   module-2:
     enabled: boolean
-    conf: |
-      contents of the module's configuration
+    files:
+      # use "conf" for the .conf file, "load" for the .load file, etc....
+      conf: |
+        contents of the module's configuration (can also use inc:${absolutePath} here)
+      load: |
+        contents of the module's load statement (if not given, the existing load file will be used,
+        can also use inc:${absolutePath} here)
   # ...
   module-N: ...
 
 sites:
-  site-1: boolean
+  site-1: boolean-or-inc:${absolutePath}
   site-2:
     enabled: boolean
-    conf: |
-      contents of the site configuration
+    files:
+      conf: |
+        contents of the site configuration (can also use inc:${absolutePath} here)
   # ...
   site-N: ...
 
 confs:
-  conf-1: boolean
+  conf-1: boolean-or-inc:${absolutePath}
   conf-2:
     enabled: boolean
-    conf: |
-      contents of the additional configuration
+    files:
+      conf: |
+        contents of the additional configuration (can also use inc:${absolutePath} here)
   # ...
   conf-N: ...
