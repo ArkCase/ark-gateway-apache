@@ -33,6 +33,8 @@ OPENSSL_EXE = "/usr/bin/openssl"
 TAR_EXE = "/usr/bin/tar"
 TEST_CONFIG_EXE = "/work/test-config"
 
+APACHE_DIR = "/etc/apache2"
+
 TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 CONF_DIR = "/conf"
@@ -42,9 +44,9 @@ WORK_ROOT = "/work"
 WORK_TMP = WORK_ROOT + "/.tmp"
 TEMPLATE_DIR = WORK_ROOT + "/templates"
 DEFAULTS_TAR_GZ = WORK_ROOT + "/defaults.tar.gz"
-WORK_DIR = tempfile.mkdtemp(prefix="apache2." + TIMESTAMP + ".", dir=WORK_TMP)
-
-APACHE_DIR = "/etc/apache2"
+WORK_DIR = APACHE_DIR + "." + TIMESTAMP
+os.makedirs(WORK_DIR, mode=0o755, exist_ok=False)
+shutil.chown(WORK_DIR, "root", "root")
 
 SSL_GID = os.environ["SSL_GID"]
 SSL_DIR = WORK_DIR + "/ssl"
@@ -632,12 +634,16 @@ except InvalidConfig as e:
 print("Configurations successfully verified!")
 WORK_DIR = os.path.realpath(WORK_DIR)
 if os.path.exists(APACHE_DIR):
-	try:
+	if os.path.islink(APACHE_DIR):
 		os.remove(APACHE_DIR)
-	except FileNotFoundError:
-		pass
+	else:
+		try:
+			shutil.rmtree(APACHE_DIR)
+		except Exception as e:
+			fail("Failed to remove the existing Apache directory at [%s]: %s" % (APACHE_DIR, strExc(e)))
 
-shutil.move(WORK_DIR, APACHE_DIR)
+os.symlink(WORK_DIR, APACHE_DIR)
+
 print("Configurations successfully deployed!")
 os.makedirs(BACKUP_DIR, mode=0o755, exist_ok=True)
 backup = BACKUP_DIR + "/config.yaml." + TIMESTAMP
