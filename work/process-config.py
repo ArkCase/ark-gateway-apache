@@ -28,10 +28,10 @@ FALSE_VALUES = dict.fromkeys(["false", "no",  "n", "0", "off", "disabled", "disa
 # First things first: create the directory where this configuration will be stored, and
 # extract the template TAR file onto it.
 
-APACHE2CTL_EXE = "/usr/sbin/apache2ctl"
 GUCCI_EXE = "/usr/local/bin/gucci"
 OPENSSL_EXE = "/usr/bin/openssl"
 TAR_EXE = "/usr/bin/tar"
+TEST_CONFIG_EXE = "/work/test-config"
 
 TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
@@ -198,7 +198,7 @@ finally:
 
 def testConfig(directory):
 	try:
-		subprocess.check_output([APACHE2CTL_EXE, "-t", "-d", directory], stderr=subprocess.STDOUT)
+		subprocess.check_output([TEST_CONFIG_EXE, directory], stderr=subprocess.STDOUT)
 	except subprocess.CalledProcessError as e:
 		raise InvalidConfig(str(e.output))
 
@@ -624,6 +624,9 @@ print("Configurations applied per [%s]" % (CONFIG))
 try:
 	testConfig(WORK_DIR)
 except InvalidConfig as e:
+	if not DEBUG:
+		print("Removing the temporary work directory at [%s]" % (WORK_DIR))
+		shutil.rmtree(WORK_DIR, ignore_errors=True)
 	fail("The configuration was applied successfully, but Apache did not validate it:\n%s" % (strExc(e)))
 
 print("Configurations successfully verified!")
@@ -634,7 +637,7 @@ if os.path.exists(APACHE_DIR):
 	except FileNotFoundError:
 		pass
 
-shutil.copytree(WORK_DIR, APACHE_DIR)
+shutil.move(WORK_DIR, APACHE_DIR)
 print("Configurations successfully deployed!")
 backup = BACKUP_DIR + "/config.yaml." + TIMESTAMP
 shutil.copy(CONFIG, backup)
