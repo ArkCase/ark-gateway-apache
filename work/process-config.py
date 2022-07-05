@@ -63,14 +63,17 @@ MODS_ENABLED = WORK_DIR + "/mods-enabled"
 SITES_AVAILABLE = WORK_DIR + "/sites-available"
 SITES_ENABLED = WORK_DIR + "/sites-enabled"
 
-SSL_TEMPLATE = TEMPLATE_DIR + "/default-ssl.conf.tpl"
-SSL_TEMPLATE_TARGET = SITES_ENABLED + "/default-ssl.conf"
+SSL_TEMPLATE_TARGET = "default-ssl.conf"
+SSL_TEMPLATE = TEMPLATE_DIR + "/" + SSL_TEMPLATE_TARGET + ".tpl"
+SSL_TEMPLATE_TARGET = SITES_ENABLED + "/" + SSL_TEMPLATE_TARGET
 
-MAIN_TEMPLATE = TEMPLATE_DIR + "/apache2.conf.tpl"
-MAIN_TEMPLATE_TARGET = WORK_DIR + "/apache2.conf"
+MAIN_TEMPLATE_TARGET = "apache2.conf"
+MAIN_TEMPLATE = TEMPLATE_DIR + "/" + MAIN_TEMPLATE_TARGET + ".tpl"
+MAIN_TEMPLATE_TARGET = WORK_DIR + "/" + MAIN_TEMPLATE_TARGET
 
-MAIN_WEB_TEMPLATE = TEMPLATE_DIR + "/00-default.conf.tpl"
-MAIN_WEB_TEMPLATE_TARGET = SITES_ENABLED + "/000-default.conf"
+MAIN_WEB_TEMPLATE_TARGET = "000-default.conf"
+MAIN_WEB_TEMPLATE = TEMPLATE_DIR + "/" + MAIN_WEB_TEMPLATE_TARGET + ".tpl"
+MAIN_WEB_TEMPLATE_TARGET = SITES_ENABLED + "/" + MAIN_WEB_TEMPLATE_TARGET
 
 INC_PARSER = re.compile("^inc:(.+)$")
 
@@ -494,9 +497,10 @@ def renderTemplate(label, template, target, user=None, group=None, mode=None):
 		pass
 
 	with open(target, "w") as out:
-		result = subprocess.run([GUCCI_EXE, "-o", "missingkey=zero", "-f", CONFIG, template], stdout=out)
-		if result.returncode != 0:
-			fail("Failed to render the %s configuration template: %s" % (label, result.output))
+		try:
+			subprocess.run([GUCCI_EXE, "-o", "missingkey=zero", "-f", CONFIG, template], stdout=out).check_returncode()
+		except subprocess.CalledProcessError as e:
+			fail("Failed to render the %s configuration template: %s" % (label, e.output))
 
 	if mode:
 		os.chmod(target, mode)
@@ -598,6 +602,10 @@ work = {}
 for key, label, processor, clearer in sections:
 	try:
 		data = yamlData[key]
+
+		if not data:
+			continue
+
 		clear = data.pop("clearDefaults", "false")
 		if TRUE_VALUES.get(str(clear).lower()) and clearer:
 			clearer(general)
