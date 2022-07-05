@@ -69,7 +69,7 @@ SSL_TEMPLATE_TARGET = SITES_ENABLED + "/default-ssl.conf"
 MAIN_TEMPLATE = TEMPLATE_DIR + "/apache2.conf.tpl"
 MAIN_TEMPLATE_TARGET = WORK_DIR + "/apache2.conf"
 
-MAIN_WEB_TEMPLATE = TEMPLATE_DIR + "/apache2.conf.tpl"
+MAIN_WEB_TEMPLATE = TEMPLATE_DIR + "/00-default.conf.tpl"
 MAIN_WEB_TEMPLATE_TARGET = SITES_ENABLED + "/000-default.conf"
 
 INC_PARSER = re.compile("^inc:(.+)$")
@@ -195,7 +195,7 @@ finally:
 
 def testConfig(directory):
 	try:
-		subprocess.check_output([APACHE2CTL_EXE, "-t", "-d", directory])
+		subprocess.check_output([APACHE2CTL_EXE, "-t", "-d", directory], stderr=subprocess.STDOUT)
 	except subprocess.CalledProcessError as e:
 		raise InvalidConfig(str(e.output))
 
@@ -284,13 +284,13 @@ def copyOrCreate(value, target=None, mode=None, user=None, group=None):
 		# must be readable.
 
 		if not os.path.exists(path):
-			raise FileNotFoundError("The file [%s] does not exist" % (srcPath))
+			raise FileNotFoundError("The file [%s] does not exist (%s)" % (srcPath, path))
 
 		if not os.path.isfile(path):
-			raise NotAFileError("The path [%s] does not refer to a regular file" % (srcPath))
+			raise NotAFileError("The path [%s] does not refer to a regular file (%s)" % (srcPath, path))
 
 		if not os.access(path, os.R_OK):
-			raise PermissionError("The file [%s] is not readable" % (srcPath))
+			raise PermissionError("The file [%s] is not readable (%s)" % (srcPath, path))
 
 		if target is None:
 			path = copyToTemp(path)
@@ -496,7 +496,7 @@ def renderTemplate(label, template, target, user=None, group=None, mode=None):
 	with open(target, "w") as out:
 		result = subprocess.run([GUCCI_EXE, "-o", "missingkey=zero", "-f", CONFIG, template], stdout=out)
 		if result.returncode != 0:
-			fail("Failed to render the %s configuration template: %s" % (label, result.stderr))
+			fail("Failed to render the %s configuration template: %s" % (label, result.output))
 
 	if mode:
 		os.chmod(target, mode)
@@ -535,7 +535,7 @@ def renderSsl(general, ssl):
 		fail("The given private key is not valid: %s" % (strExc(e)))
 
 	# Now compute the Certification Authorities
-	print("Rendering the CA lists into [%s]" % (PATH_CRL))
+	print("Rendering the CA lists into [%s]" % (PATH_CA))
 	newCa = []
 	ca = ssl.get("ca")
 	if ca:
