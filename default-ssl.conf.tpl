@@ -1,8 +1,8 @@
 <IfModule mod_ssl.c>
 	<VirtualHost _default_:443>
-		ServerAdmin {{ .ssl.serverAdmin | default "webmaster@localhost" | quote }}
+		ServerAdmin {{ coalesce .ssl.serverAdmin (.main).serverAdmin "webmaster@localhost" | quote }}
 
-		DocumentRoot {{ .ssl.documentRoot | default "/var/www/html" | quote }}
+		DocumentRoot {{ coalesce .ssl.documentRoot (.main).documentRoot "/var/www/html" | quote }}
 
 		# Available loglevels: trace8, ..., trace1, debug, info, notice, warn,
 		# error, crit, alert, emerg.
@@ -14,8 +14,8 @@
 		#LogLevel info ssl:warn
 		{{- end }}
 
-		ErrorLog {{ (.ssl.log).error | default "${APACHE_LOG_DIR}/error.log" }}
-		CustomLog {{ (.ssl.log).custom | default "${APACHE_LOG_DIR}/access.log combined" }}
+		ErrorLog {{ coalesce (.ssl.log).error "${APACHE_LOG_DIR}/error.log" }}
+		CustomLog {{ coalesce (.ssl.log).custom "${APACHE_LOG_DIR}/access.log combined" }}
 
 		# For most configuration files from conf-available/, which are
 		# enabled or disabled at a global level, it is possible to
@@ -39,8 +39,8 @@
 		#   /usr/share/doc/apache2/README.Debian.gz for more info.
 		#   If both key and certificate are stored in the same file, only the
 		#   SSLCertificateFile directive is needed.
-		SSLCertificateFile    /ssl/cert.pem
-		SSLCertificateKeyFile /ssl/key.pem
+		SSLCertificateFile    "ssl/cert.pem"
+		SSLCertificateKeyFile "ssl/key.pem"
 
 		#   Server Certificate Chain:
 		#   Point SSLCertificateChainFile at a file containing the
@@ -59,8 +59,8 @@
 		#		 to point to the certificate files. Use the provided
 		#		 Makefile to update the hash symlinks after changes.
 		#SSLCACertificatePath /etc/ssl/certs/
-		<IfFile "/ssl/ca.pem">
-		SSLCACertificateFile /ssl/ca.pem
+		<IfFile "ssl/ca.pem">
+		SSLCACertificateFile "ssl/ca.pem"
 		</IfFile>
 
 		#   Certificate Revocation Lists (CRL):
@@ -71,8 +71,8 @@
 		#		 to point to the certificate files. Use the provided
 		#		 Makefile to update the hash symlinks after changes.
 		#SSLCARevocationPath /etc/apache2/ssl.crl/
-		<IfFile "/ssl/crl.pem">
-		SSLCARevocationFile /ssl/crl.pem
+		<IfFile "ssl/crl.pem">
+		SSLCARevocationFile "ssl/crl.pem"
 		</IfFile>
 
 		#   Client Authentication (Type):
@@ -81,8 +81,8 @@
 		#   number which specifies how deeply to verify the certificate
 		#   issuer chain before deciding the certificate is not valid.
 		{{- if .ssl.client }}
-		SSLVerifyClient {{ .ssl.client.verify | default "require" }}
-		SSLVerifyDepth  {{ int (.ssl.client.depth | default "10") }}
+		SSLVerifyClient {{ coalesce .ssl.client.verify "require" }}
+		SSLVerifyDepth  {{ int (coalesce .ssl.client.depth "10") }}
 		{{- else }}
 		#SSLVerifyClient require
 		#SSLVerifyDepth  10

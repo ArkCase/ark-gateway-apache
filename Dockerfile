@@ -24,6 +24,9 @@ LABEL IMAGE_SOURCE="https://github.com/ArkCase/ark_gateway_apache"
 
 ENV APACHE_UID="${UID}"
 ENV SSL_GID="${SSL_GID}"
+ENV WORK_DIR="/work"
+ENV WORK_TMP="${WORK_DIR}/.tmp"
+ENV WORK_TPL="${WORK_DIR}/templates"
 RUN apt-get update && apt-get -y dist-upgrade
 RUN apt-get install -y \
         apache2 \
@@ -33,18 +36,27 @@ RUN apt-get install -y \
         wget
 RUN curl -L -o /usr/local/bin/gucci "${GUCCI_SRC}" && chmod a+rx /usr/local/bin/gucci
 RUN usermod -a -G "${SSL_GID}" "${UID}"
-COPY "entrypoint" "reload" "/"
-COPY "process-config.py" "reconfig" "default-ssl.conf.tpl" "/etc/apache2/"
-RUN rm -f "/etc/apache2/sites-available/default-ssl.conf"
-RUN mkdir "/ssl" && chown "root:${SSL_GID}" "/ssl" && chmod 0750 "/ssl"
+RUN mkdir -p "${WORK_TMP}" && chown -R "root:" "${WORK_DIR}" && chmod 0750 "${WORK_DIR}"
+COPY    "entrypoint" "reload" "/"
 
-WORKDIR "/etc/apache2"
+COPY    "defaults.tar.gz" \
+        "process-config.py" \
+        "reconfig" \
+        "${WORK_DIR}/"
+
+COPY    "apache2.conf.tpl" \
+        "000-default.conf.tpl" \
+        "default-ssl.conf.tpl" \
+        "${WORK_TPL}/"
+
+# This directory will be rendered via configuration
+RUN rm -rf "/etc/apache2"
 
 #
 # Final parameters
 #
 WORKDIR     "/var/www"
-VOLUME      [ "/conf" ]
+VOLUME      [ "/conf/ext" ]
 VOLUME      [ "/var/www" ]
 VOLUME      [ "/var/log/apache2" ]
 EXPOSE      80/tcp

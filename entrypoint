@@ -5,7 +5,7 @@ set -eu -o pipefail
 #
 # Apply the reconfigurations
 #
-. /etc/apache2/reconfig || exit ${?}
+. /work/reconfig || exit ${?}
 
 #
 # All is well, start Apache in the foreground

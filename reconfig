@@ -9,7 +9,7 @@ set -eu -o pipefail
 # This is the default configuration location, which can be overridden
 # via the environment
 #
-CONFIG="${CONFIG:-/conf/config.yaml}"
+CONFIG="${CONFIG:-/conf/ext/config.yaml}"
 
 timestamp() {
 	date "+%Y/%m/%d %H:%M:%S %Z"
@@ -41,15 +41,4 @@ APACHECTL="$(which "apache2ctl")"
  [ -f "${CONFIG}" ] || fail "The item at [${CONFIG}] is not a regular file - cannot continue"
  [ -r "${CONFIG}" ] || fail "The file at [${CONFIG}] is not readable - cannot continue"
 
-"${BASEDIR}/process-config.py" "${CONFIG}"
-RC=${?}
-[ ${RC} -eq 0 ] || EXIT_CODE=${RC} fail "Failed to apply the configurations from [${CONFIG}]"
-
-#
-# Make sure the configuration is valid after all the manupulations
-#
-"${APACHECTL}" configtest
-RC=${?}
-[ ${RC} -eq 0 ] || EXIT_CODE=${RC} fail "Configuration test failed (RC=${RC}) - will not gracefully restart the service"
-
-exit 0
+"${BASEDIR}/process-config.py" "${CONFIG}" || EXIT_CODE=${?} fail "Failed to apply the configurations from [${CONFIG}]"

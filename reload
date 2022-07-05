@@ -5,9 +5,9 @@ set -eu -o pipefail
 #
 # Apply the reconfigurations
 #
-. /etc/apache2/reconfig || exit ${?}
+. /work/reconfig || exit ${?}
 
 #
 # All is well, restart Apache gracefully
 #
-echo /usr/sbin/apache2ctl -DFOREGROUND "${@}"
+echo /usr/sbin/apache2ctl graceful "${@}"
