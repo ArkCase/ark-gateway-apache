@@ -639,6 +639,7 @@ if os.path.exists(APACHE_DIR):
 
 shutil.move(WORK_DIR, APACHE_DIR)
 print("Configurations successfully deployed!")
+os.makedirs(BACKUP_DIR, mode=0o755, exist_ok=True)
 backup = BACKUP_DIR + "/config.yaml." + TIMESTAMP
 shutil.copy(CONFIG, backup)
 print("Configurations successfully stored for backup as [%s]!" % (backup))
