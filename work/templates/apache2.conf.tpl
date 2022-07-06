@@ -66,7 +66,7 @@
 #
 # Do NOT add a slash at the end of the directory path.
 #
-ServerRoot {{ default "/etc/apache2" (.main).serverRoot | quote }}
+ServerRoot {{ coalesce (.main).serverRoot "/etc/apache2" | quote }}
 
 #
 # The accept serialization lock file MUST BE STORED ON A LOCAL DISK.
@@ -89,26 +89,26 @@ PidFile ${APACHE_PID_FILE}
 #
 # Timeout: The number of seconds before receives and sends time out.
 #
-Timeout {{ int (default 300 (.main).timeout) }}
+Timeout {{ int (coalesce (.main).timeout 300) }}
 
 #
 # KeepAlive: Whether or not to allow persistent connections (more than
 # one request per connection). Set to "Off" to deactivate.
 #
-KeepAlive {{ default "On" (.main).keepAlive }}
+KeepAlive {{ coalesce (.main).keepAlive "On" }}
 
 #
 # MaxKeepAliveRequests: The maximum number of requests to allow
 # during a persistent connection. Set to 0 to allow an unlimited amount.
 # We recommend you leave this number high, for maximum performance.
 #
-MaxKeepAliveRequests {{ int (default 100 (.main).maxKeepAliveRequests) }}
+MaxKeepAliveRequests {{ int (coalesce (.main).maxKeepAliveRequests 100) }}
 
 #
 # KeepAliveTimeout: Number of seconds to wait for the next request from the
 # same client on the same connection.
 #
-KeepAliveTimeout {{ int (default 5 (.main).keepAliveTimeout) }}
+KeepAliveTimeout {{ int (coalesce (.main).keepAliveTimeout 5) }}
 
 
 # These need to be set in /etc/apache2/envvars
@@ -123,7 +123,7 @@ Group ${APACHE_RUN_GROUP}
 # each client request will result in AT LEAST one lookup request to the
 # nameserver.
 #
-HostnameLookups {{ default "Off" (.main).hostnameLookups }}
+HostnameLookups {{ coalesce (.main).hostnameLookups "Off" }}
 
 # ErrorLog: The location of the error log file.
 # If you do not specify an ErrorLog directive within a <VirtualHost>
@@ -140,7 +140,7 @@ ErrorLog ${APACHE_LOG_DIR}/error.log
 # It is also possible to configure the log level for particular modules, e.g.
 # "LogLevel info ssl:warn"
 #
-LogLevel {{ default "warn" (.main).logLevel }}
+LogLevel {{ coalesce (.main).logLevel "warn" }}
 
 # Include module configuration:
 IncludeOptional mods-enabled/*.load
@@ -186,7 +186,7 @@ Include ports.conf
 # for additional configuration directives.  See also the AllowOverride
 # directive.
 #
-AccessFileName {{ default ".htaccess" (.main).accessFileName }}
+AccessFileName {{ coalesce (.main).accessFileName ".htaccess" }}
 
 #
 # The following lines prevent .htaccess and .htpasswd files from being

@@ -8,8 +8,8 @@
 	# However, you must set it for any further virtual host explicitly.
 	#ServerName www.example.com
 
-	ServerAdmin {{ (.main).serverAdmin | default "webmaster@localhost" | quote }}
-	DocumentRoot {{ (.main).documentRoot | default "/var/www/html" | quote }}
+	ServerAdmin {{ coalesce (.main).serverAdmin "webmaster@localhost" | quote }}
+	DocumentRoot {{ coalesce (.main).documentRoot "/var/www/html" | quote }}
 
 	# Available loglevels: trace8, ..., trace1, debug, info, notice, warn,
 	# error, crit, alert, emerg.
@@ -22,8 +22,8 @@
 	#LogLevel info ssl:warn
 	{{- end }}
 
-	ErrorLog	{{ ((.main).log).error  | default "${APACHE_LOG_DIR}/error.log" }}
-	CustomLog	{{ ((.main).log).custom | default "${APACHE_LOG_DIR}/access.log combined" }}
+	ErrorLog	{{ coalesce ((.main).log).error  "${APACHE_LOG_DIR}/error.log" }}
+	CustomLog	{{ coalesce ((.main).log).custom "${APACHE_LOG_DIR}/access.log combined" }}
 
 	# For most configuration files from conf-available/, which are
 	# enabled or disabled at a global level, it is possible to
