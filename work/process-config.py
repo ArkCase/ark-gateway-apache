@@ -90,6 +90,14 @@ try:
 except ImportError:
 	from yaml import Loader, Dumper
 
+#
+# A utility function that facilitates seeing exception dumps
+#
+def strExc(e):
+	if DEBUG:
+		return traceback.format_exc(e)
+	return str(e)
+
 # 
 # A utility function to convert values to booleans
 #
@@ -125,11 +133,6 @@ def debug(msg, *args):
 	if not DEBUG:
 		return None
 	print(msg % args)
-
-def strExc(e):
-	if DEBUG:
-		return traceback.format_exc(e)
-	return str(e)
 
 #
 # Set the dry run mode
@@ -175,51 +178,49 @@ class InvalidCertificateKey(Exception):
 class InvalidCertificationAuthority(Exception):
 	pass
 
+class Failure(Exception):
+	pass
+
 def fail(message, exitCode = 1):
 	print(message)
-	sys.exit(exitCode)
+	raise Failure(exitCode)
 
-if len(sys.argv) < 2:
-	fail("usage: %s config-file" % sys.argv[0])
-
-CONFIG = sys.argv[1]
-if not os.path.exists(CONFIG):
-	fail("Configuration file [%s] does not exist" % CONFIG)
-if not os.path.isfile(CONFIG):
-	fail("The path [%s] does refer to a regular file" % CONFIG)
-
-try:
-	document = open(CONFIG)
-except Exception as e:
-	fail("Failed to open the configuration from [%s]: %s" % (CONFIG, strExc(e)))
-
-try:
-	yamlData = load(document, Loader=Loader)
-
-	if yamlData is None:
-		print("No configuration data loaded from [%s]" % (CONFIG))
-		sys.exit(0)
-
-	if not isinstance(yamlData, TYPE_DICT):
-		fail("Bad YAML structure - must produce a dict:\n%s" % (yamlData))
-except Exception as e:
-	msg = ""
-	if hasattr(e, 'problem_mark'):
-		mark = e.problem_mark
-		msg = "YAML syntax error in the configuration data at line %s, column %s of [%s]" % (mark.line + 1, mark.column + 1, CONFIG)
-	else:
-		msg = "Failed to parse the YAML data from [%s]" % (strExc(e), CONFIG)
-	fail(msg)
-finally:
-	# Clean up if necessary
-	if not isinstance(document, TYPE_STRING):
-		document.close()
+def loadConfig(config):
+	with open(config, "r") as document:
+		try:
+			yamlData = load(document, Loader=Loader)
+			if yamlData is None:
+				print("No configuration data loaded from [%s]" % (config))
+				yamlData = {}
+			elif not isinstance(yamlData, TYPE_DICT):
+				fail("Bad YAML structure - must produce a dict:\n%s" % (yamlData))
+			return yamlData
+		except Exception as e:
+			msg = ""
+			if hasattr(e, 'problem_mark'):
+				mark = e.problem_mark
+				msg = "YAML syntax error in the configuration data at line %s, column %s of [%s]" % (mark.line + 1, mark.column + 1, config)
+			else:
+				msg = "Failed to parse the YAML data from [%s]" % (strExc(e), config)
+			fail(msg)
 
 def testConfig(directory):
 	try:
 		subprocess.check_output([TEST_CONFIG_EXE, directory], stderr=subprocess.STDOUT)
 	except subprocess.CalledProcessError as e:
 		raise InvalidConfig(str(e.output))
+
+def assertFile(path):
+	if not os.path.exists(path):
+		raise FileNotFoundError("The file [%s] does not exist" % (path))
+
+	if not os.path.isfile(path):
+		raise NotAFileError("The path [%s] does not refer to a regular file" % (path))
+
+	if not os.access(path, os.R_OK):
+		raise PermissionError("The file [%s] is not readable" % (path))
+
+	return os.path.realpath(path)
 
 def copyToTemp(src):
 	(handle, path) = tempfile.mkstemp()
@@ -289,31 +290,24 @@ def concatToTarget(sources, target=None, mode=None, user=None, group=None):
 
 	return target
 
-def copyOrCreate(value, target=None, mode=None, user=None, group=None):
+def createOrInclude(value, target=None, mode=None, user=None, group=None):
 	path = value
 	m = INC_PARSER.match(value)
 	if m:
 		# It's an include! Validate that the path exists, and refers to a regular
 		# file that is readable
 		path = m.group(1)
-		srcPath = path
 
-		# Make sure the path never overflows
-		path = os.path.normpath("/" + path)[1:]
-		path = CONF_DIR + "/" + path
+		fullPath = os.path.normpath(CONFIG_DIR + "/" + path)
+		fullPath = os.path.realpath(fullPath)
+		if os.path.commonpath([CONF_DIR, fullPath]) == "/":
+			fail("The given path [%s] overflows from the configuration path" % (path))
+		path = fullPath
 
 		# The path must exist, refer to a regualr file, and the file
 		# must be readable.
 
-		if not os.path.exists(path):
-			raise FileNotFoundError("The file [%s] does not exist (%s)" % (srcPath, path))
-
-		if not os.path.isfile(path):
-			raise NotAFileError("The path [%s] does not refer to a regular file (%s)" % (srcPath, path))
-
-		if not os.access(path, os.R_OK):
-			raise PermissionError("The file [%s] is not readable (%s)" % (srcPath, path))
-
+		path = assertFile(path)
 		if target is None:
 			path = copyToTemp(path)
 		else:
@@ -332,7 +326,7 @@ def copyOrCreate(value, target=None, mode=None, user=None, group=None):
 
 def ensurePEMValid(value, target=None, asKey=False, mode=None, user=None, group=None):
 	# Verify that the file's contents are a PEM-encoded "something" (cert or key)
-	info = copyOrCreate(value, target, mode, user, group)
+	info = createOrInclude(value, target, mode, user, group)
 	try:
 		command = [OPENSSL_EXE, "x509", "-text", "-noout", "-in", info["path"]]
 		if asKey:
@@ -359,13 +353,13 @@ def ensurePEMValid(value, target=None, asKey=False, mode=None, user=None, group=
 
 def checkPEMCorrelation(key, cert):
 	# Get the private key's modulus
-	keyResult = subprocess.run([OPENSSL_EXE, "rsa", "-modulus", "-noout", "-in", key, "-passin", "pass:"])
+	keyResult = subprocess.run([OPENSSL_EXE, "rsa", "-modulus", "-noout", "-in", key, "-passin", "pass:"], capture_output=True)
 	# If this didn't return 0, then it's not a valid private key
 	if keyResult.returncode != 0:
 		return False
 
 	# Get the certificate's modulus
-	certResult = subprocess.run([OPENSSL_EXE, "x509", "-modulus", "-noout", "-in", cert])
+	certResult = subprocess.run([OPENSSL_EXE, "x509", "-modulus", "-noout", "-in", cert], capture_output=True)
 	# If this didn't return 0, then it's not a valid certificate
 	if certResult.returncode != 0:
 		return False
@@ -546,6 +540,9 @@ def renderTemplate(label, template, target, user=None, group=None, mode=None):
 
 def renderSsl(general, ssl):
 
+	if not ssl:
+		ssl = {}
+
 	# First things first: is it disabled?
 	if not toBoolean(ssl.get("enabled"), True):
 		return
@@ -556,6 +553,12 @@ def renderSsl(general, ssl):
 	key = ssl.get("key")
 
 	if not cert and not key:
+		if cert is None:
+			cert = DEFAULT_CERT
+
+		if key is None:
+			key = DEFAULT_KEY
+
 		print("No certificate information found - cannot configure SSL")
 		return
 
@@ -628,72 +631,103 @@ def renderMain(general, ssl):
 	renderTemplate("website", MAIN_WEB_TEMPLATE, MAIN_WEB_TEMPLATE_TARGET, "root", "root", 0o644)
 	renderTemplate("environment", ENV_TEMPLATE, ENV_TEMPLATE_TARGET, "root", "root", 0o644)
 
-sections = []
-sections += [( "modules", "modules",    processModules, clearModules )]
-sections += [( "sites",   "sites",      processSites,   clearSites   )]
-sections += [( "confs",   "additional", processConfs,   clearConfs   )]
-sections += [( "ssl",     "SSL",        renderSsl,      None         )]
-sections += [( "main",    "main",       renderMain,     None         )]
+def mainBlock(config, workDir):
+	yamlData = loadConfig(config)
+	sections = []
+	sections += [( "modules", "modules",    processModules, clearModules )]
+	sections += [( "sites",   "sites",      processSites,   clearSites   )]
+	sections += [( "confs",   "additional", processConfs,   clearConfs   )]
+	sections += [( "ssl",     "SSL",        renderSsl,      None         )]
+	sections += [( "main",    "main",       renderMain,     None         )]
 
-# First things first - extract the TAR file into the work directory
-try:
-	subprocess.check_output([TAR_EXE, "-C", WORK_DIR, "-xzvf", DEFAULTS_TAR_GZ])
-except subprocess.CalledProcessError as e:
-	fail("Failed to extract the configuration defaults (rc = %d): %s" % (e.returncode, e.output))
-
-general = {}
-for key, label, processor, defaultsRemover in sections:
-	data = yamlData.get(key)
-	if not data:
-		continue
-
-	removeDefaults = data.pop("removeDefaults", "false")
-	if toBoolean(removeDefaults) and defaultsRemover:
-		defaultsRemover(general)
-
+	# First things first - extract the TAR file into the work directory
 	try:
-		processor(general, data)
-	except Exception as e:
-		fail("Failed to process the %s configurations from [%s]: %s" % (label, CONFIG, strExc(e)))
+		subprocess.check_output([TAR_EXE, "-C", workDir, "-xzvf", DEFAULTS_TAR_GZ])
+	except subprocess.CalledProcessError as e:
+		fail("Failed to extract the configuration defaults (rc = %d): %s" % (e.returncode, e.output))
 
-print("Configurations applied per [%s]" % (CONFIG))
+	general = {}
+	for key, label, processor, defaultsRemover in sections:
+		data = yamlData.get(key)
 
-# Now, validate the configurations
-try:
-	testConfig(WORK_DIR)
-except InvalidConfig as e:
-	if not DEBUG:
-		print("Removing the temporary work directory at [%s]" % (WORK_DIR))
-		shutil.rmtree(WORK_DIR, ignore_errors=True)
-	fail("The configuration was applied successfully, but Apache did not validate it:\n%s" % (strExc(e)))
+		if data:
+			removeDefaults = data.pop("removeDefaults", "false")
+			if toBoolean(removeDefaults) and defaultsRemover:
+				defaultsRemover(general)
 
-print("Configurations successfully verified!")
-WORK_DIR = os.path.realpath(WORK_DIR)
-
-if DRY_RUN:
-	print("Dry run is active, configurations will not be deployed")
-	try:
-		shutil.rmtree(WORK_DIR)
-	except Exception as e:
-		print("Failed to remove the dry run work directory at [%s]" % (WORK_DIR))
-	sys.exit(0)
-
-print("Deploying the configurations to [%s]..." % (APACHE_DIR))
-if os.path.exists(APACHE_DIR):
-	if os.path.islink(APACHE_DIR):
-		os.remove(APACHE_DIR)
-	else:
 		try:
-			shutil.rmtree(APACHE_DIR)
+			processor(general, data)
+		except Failure as e:
+			raise e
 		except Exception as e:
-			fail("Failed to remove the existing Apache directory at [%s]: %s" % (APACHE_DIR, strExc(e)))
+			fail("Failed to process the %s configurations from [%s]: %s" % (label, config, strExc(e)))
 
-os.symlink(WORK_DIR, APACHE_DIR)
-print("Configurations successfully deployed!")
+	print("Configurations applied per [%s]" % (config))
 
-print("Backing up the configurations...")
-os.makedirs(BACKUP_DIR, mode=0o755, exist_ok=True)
-backup = BACKUP_DIR + "/config.yaml." + TIMESTAMP
-shutil.copy(CONFIG, backup)
-print("Configurations successfully stored for backup as [%s]!" % (backup))
-sys.exit(0)
+	# Now, validate the configurations
+	try:
+		testConfig(workDir)
+	except InvalidConfig as e:
+		if not DEBUG:
+			print("Removing the temporary work directory at [%s]" % (workDir))
+			shutil.rmtree(workDir, ignore_errors=True)
+		fail("The configuration was applied successfully, but Apache did not validate it:\n%s" % (strExc(e)))
+
+	print("Configurations successfully verified!")
+	workDir = os.path.realpath(workDir)
+
+	if DRY_RUN:
+		print("Dry run is active, configurations will not be deployed")
+		try:
+			shutil.rmtree(workDir)
+		except Exception as e:
+			print("Failed to remove the dry run work directory at [%s]" % (workDir))
+		return 0
+
+	print("Deploying the configurations to [%s]..." % (APACHE_DIR))
+	if os.path.exists(APACHE_DIR):
+		if os.path.islink(APACHE_DIR):
+			os.remove(APACHE_DIR)
+		else:
+			try:
+				shutil.rmtree(APACHE_DIR)
+			except Exception as e:
+				fail("Failed to remove the existing Apache directory at [%s]: %s" % (APACHE_DIR, strExc(e)))
+
+	os.symlink(os.path.basename(workDir), APACHE_DIR)
+	print("Configurations successfully deployed!")
+
+	print("Backing up the configurations...")
+	os.makedirs(BACKUP_DIR, mode=0o755, exist_ok=True)
+	backup = BACKUP_DIR + "/config.yaml." + TIMESTAMP
+	shutil.copy(config, backup)
+	print("Configurations successfully stored for backup as [%s]!" % (backup))
+	return 0
+
+#
+# Begin the primary execution cycle
+#
+if len(sys.argv) != 2:
+	fail("usage: %s configuration-file.yaml" % sys.argv[0])
+
+CONFIG = assertFile(sys.argv[1])
+CONFIG_DIR = os.path.dirname(CONFIG)
+
+
+deleteWork = False
+retCode = 0
+try:
+	retCode = mainBlock(CONFIG, WORK_DIR)
+except Failure as e:
+	deleteWork = (not DEBUG)
+	retCode = int(str(e))
+except Exception as e:
+	print("Uncaught exception:\n%s" % (strExc(e)))
+	retCode = 1
+finally:
+	if deleteWork and os.path.exists(WORK_DIR):
+		try:
+			shutil.rmtree(WORK_DIR)
+		except Exception as e:
+			print("Failed to remove the work directory at [%s]: %s" % (WORK_DIR, strExc(e)))
+sys.exit(retCode)
