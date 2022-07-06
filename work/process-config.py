@@ -400,7 +400,11 @@ def listAvailable(src, ext):
 	ret.sort()
 	return ret
 
-def processLinkDirectory(general, name, data, available, enabled, mainExt, extraExt = [], extraRequired = False):
+def processLinkDirectory(general, label, name, data, available, enabled, mainExt, extraExt = [], extraRequired = False):
+	if not data:
+		print("No %s configurations to process, skipping this step" % (label))
+		return None
+
 	# First things first - make sure that the requested configuration is viable
 	# available = dict.fromkeys(listAvailable(available, extensions), True)
 	reqMain = dict.fromkeys(listAvailable(available, mainExt), True)
@@ -514,21 +518,21 @@ def clearModules(general):
 
 def processModules(general, modules):
 	print("Processing the module configurations")
-	return processLinkDirectory(general, "modules", modules, MODS_AVAILABLE, MODS_ENABLED, "conf", "load", True)
+	return processLinkDirectory(general, "module" "modules", modules, MODS_AVAILABLE, MODS_ENABLED, "conf", "load", True)
 
 def clearSites(general):
 	return clearLinkDirectory(general, "site", MODS_ENABLED)
 
 def processSites(general, sites):
 	print("Processing the site configurations")
-	return processLinkDirectory(general, "sites", sites, SITES_AVAILABLE, SITES_ENABLED, "conf", [])
+	return processLinkDirectory(general, "site", "sites", sites, SITES_AVAILABLE, SITES_ENABLED, "conf", [])
 
 def clearConfs(general):
 	return clearLinkDirectory(general, "additional", MODS_ENABLED)
 
 def processConfs(general, confs):
 	print("Processing the additional configurations")
-	return processLinkDirectory(general, "confs", confs, CONF_AVAILABLE, CONF_ENABLED, "conf", [])
+	return processLinkDirectory(general, "additional", "confs", confs, CONF_AVAILABLE, CONF_ENABLED, "conf", [])
 
 def renderTemplate(label, template, target, user=None, group=None, mode=None):
 	print("Rendering the %s configuration into [%s]" % (label, target))
