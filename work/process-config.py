@@ -336,7 +336,7 @@ def ensurePEMValid(value, target=None, asKey=False, mode=None, user=None, group=
 	try:
 		command = [OPENSSL_EXE, "x509", "-text", "-noout", "-in", info["path"]]
 		if asKey:
-			command = [OPENSSL_EXE, "rsa", "-in", info["path"], "-check"]
+			command = [OPENSSL_EXE, "rsa", "-in", info["path"], "-check", "-passin", "pass:"]
 		subprocess.check_output(command)
 	except subprocess.CalledProcessError as e:
 		# The file does not contain the PEM-encoded crap we seek. Thus, assume
