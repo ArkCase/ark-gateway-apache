@@ -21,9 +21,7 @@ import traceback
 TYPE_LIST = type([])
 TYPE_STRING = type("")
 TYPE_DICT = type({})
-
-TRUE_VALUES  = dict.fromkeys(["true",  "yes", "y", "1", "on",  "enabled",  "enable" ], True)
-FALSE_VALUES = dict.fromkeys(["false", "no",  "n", "0", "off", "disabled", "disable"], False)
+TYPE_BOOL = type(True)
 
 # First things first: create the directory where this configuration will be stored, and
 # extract the template TAR file onto it.
@@ -92,16 +90,37 @@ try:
 except ImportError:
 	from yaml import Loader, Dumper
 
+# 
+# A utility function to convert values to booleans
+#
+TRUE_VALUES  = dict.fromkeys(["true",  "yes", "y", "1", "on",  "enabled",  "enable" ], True)
+FALSE_VALUES = dict.fromkeys(["false", "no",  "n", "0", "off", "disabled", "disable"], False)
+def toBoolean(value, default=False):
+	# Ensure the default is a boolean value
+	if default is None:
+		# If no default is given, then it's assumed to be False
+		default = False
+	elif not isinstance(default, TYPE_BOOL):
+		# If a default is given, but it's not a boolean, then
+		# perform the conversion
+		default = (TRUE_VALUES.get(str(default).lower()) is not None)
+
+	# If there's no value to be analyzed, we return the default
+	# we were given
+	if value is None:
+		return default
+
+	# Now, see if this value is one of the true-values. If not, then
+	# we assume it's a false-value
+	value = TRUE_VALUES.get(str(value).lower())
+	if value is None:
+		value = default
+	return value
+
 #
 # Set the debug mode
 #
-DEBUG = False
-try:
-	DEBUG = TRUE_VALUES.get(os.environ["DEBUG"].lower())
-except KeyError:
-	# Do nothing - stick to the default value
-	pass
-
+DEBUG = toBoolean(os.environ.get("DEBUG"))
 def debug(msg, *args):
 	if not DEBUG:
 		return None
@@ -115,16 +134,10 @@ def strExc(e):
 #
 # Set the dry run mode
 #
-DRY_RUN = False
-try:
-	dr = os.environ["DRY_RUN"].lower()
-	if TRUE_VALUES.get(dr):
-		DRY_RUN = True
-		DEBUG = True
-		debug("WARNING: Dry run mode active")
-except KeyError:
-	# Do nothing - stick to the default value
-	pass
+DRY_RUN = toBoolean(os.environ.get("DRY_RUN"))
+if DRY_RUN:
+	DEBUG = True
+	debug("WARNING: Dry run mode active")
 
 class InvalidPEMFile(Exception):
 	pass
@@ -380,7 +393,7 @@ def processLinkDirectory(general, name, data, available, enabled, mainExt, extra
 		# First things first: is this value a string?
 		if isinstance(value, TYPE_STRING):
 			# Is this a boolean-value?
-			if TRUE_VALUES.get(value.lower()):
+			if toBoolean(value):
 				# This is a boolean-value, so stow it to create the link(s)
 				# to the available file(s) into the target as needed
 				simpleLinks += [key]
@@ -404,8 +417,7 @@ def processLinkDirectory(general, name, data, available, enabled, mainExt, extra
 		if isinstance(value, TYPE_DICT):
 
 			# First things first: is it enabled?
-			enabled = value.pop("enabled", "true")
-			enabled = TRUE_VALUES.get(str(enabled).lower())
+			enabled = toBoolean(value.pop("enabled", "true"))
 
 			# If it's not enabled, simply skip it and do nothing
 			if not enabled:
@@ -517,7 +529,13 @@ def renderTemplate(label, template, target, user=None, group=None, mode=None):
 	return target
 
 def renderSsl(general, ssl):
+
+	# First things first: is it disabled?
+	if not toBoolean(ssl.get("enabled"), True):
+		return
+
 	print("Processing the SSL configuration")
+
 	cert = ssl.get("cert")
 	key = ssl.get("key")
 
@@ -605,25 +623,19 @@ except subprocess.CalledProcessError as e:
 	fail("Failed to extract the configuration defaults (rc = %d): %s" % (e.returncode, e.output))
 
 general = {}
-work = {}
-for key, label, processor, clearer in sections:
+for key, label, processor, defaultsRemover in sections:
+	data = yamlData.get(key)
+	if not data:
+		continue
+
+	removeDefaults = data.pop("removeDefaults", "false")
+	if toBoolean(removeDefaults) and defaultsRemover:
+		defaultsRemover(general)
+
 	try:
-		data = yamlData[key]
-
-		if not data:
-			continue
-
-		clear = data.pop("clearDefaults", "false")
-		if TRUE_VALUES.get(str(clear).lower()) and clearer:
-			clearer(general)
-
-		try:
-			work[key] = { "label" : label, "result" : processor(general, data) }
-		except Exception as e:
-			fail("Failed to process the %s configurations from [%s]: %s" % (label, CONFIG, strExc(e)))
-
-	except KeyError:
-		print("No %s configurations found in [%s]" % (label, CONFIG))
+		processor(general, data)
+	except Exception as e:
+		fail("Failed to process the %s configurations from [%s]: %s" % (label, CONFIG, strExc(e)))
 
 print("Configurations applied per [%s]" % (CONFIG))
 
@@ -638,6 +650,16 @@ except InvalidConfig as e:
 
 print("Configurations successfully verified!")
 WORK_DIR = os.path.realpath(WORK_DIR)
+
+if DRY_RUN:
+	print("Dry run is active, configurations will not be deployed")
+	try:
+		shutil.rmtree(WORK_DIR)
+	except Exception as e:
+		print("Failed to remove the dry run work directory at [%s]" % (WORK_DIR))
+	sys.exit(0)
+
+print("Deploying the configurations to [%s]..." % (APACHE_DIR))
 if os.path.exists(APACHE_DIR):
 	if os.path.islink(APACHE_DIR):
 		os.remove(APACHE_DIR)
@@ -648,8 +670,9 @@ if os.path.exists(APACHE_DIR):
 			fail("Failed to remove the existing Apache directory at [%s]: %s" % (APACHE_DIR, strExc(e)))
 
 os.symlink(WORK_DIR, APACHE_DIR)
-
 print("Configurations successfully deployed!")
+
+print("Backing up the configurations...")
 os.makedirs(BACKUP_DIR, mode=0o755, exist_ok=True)
 backup = BACKUP_DIR + "/config.yaml." + TIMESTAMP
 shutil.copy(CONFIG, backup)
