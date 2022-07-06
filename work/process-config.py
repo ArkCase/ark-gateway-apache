@@ -67,6 +67,11 @@ SSL_TEMPLATE_TARGET = "default-ssl.conf"
 SSL_TEMPLATE = TEMPLATE_DIR + "/" + SSL_TEMPLATE_TARGET + ".tpl"
 SSL_TEMPLATE_TARGET = SITES_ENABLED + "/" + SSL_TEMPLATE_TARGET
 
+SSL_DEFAULT_CERT = CONF_DIR + "/" + "cert.pem"
+SSL_DEFAULT_KEY = CONF_DIR + "/" + "key.pem"
+SSL_DEFAULT_CA = CONF_DIR + "/" + "ca.pem"
+SSL_DEFAULT_CRL = CONF_DIR + "/" + "crl.pem"
+
 ENV_TEMPLATE_TARGET = "envvars"
 ENV_TEMPLATE = TEMPLATE_DIR + "/" + ENV_TEMPLATE_TARGET + ".tpl"
 ENV_TEMPLATE_TARGET = WORK_DIR + "/" + ENV_TEMPLATE_TARGET
@@ -210,17 +215,29 @@ def testConfig(directory):
 	except subprocess.CalledProcessError as e:
 		raise InvalidConfig(str(e.output))
 
-def assertFile(path):
+def assertFile(path, silent = False):
 	if not os.path.exists(path):
+		if silent:
+			return None
 		raise FileNotFoundError("The file [%s] does not exist" % (path))
 
 	if not os.path.isfile(path):
+		if silent:
+			return None
 		raise NotAFileError("The path [%s] does not refer to a regular file" % (path))
 
 	if not os.access(path, os.R_OK):
+		if silent:
+			return None
 		raise PermissionError("The file [%s] is not readable" % (path))
 
 	return os.path.realpath(path)
+
+def assertConfigFile(path):
+	path = assertFile(path)
+	if os.path.commonpath([CONF_DIR, path]) == "/":
+		fail("The given path [%s] overflows from the configuration path" % (path))
+	return path
 
 def copyToTemp(src):
 	(handle, path) = tempfile.mkstemp()
@@ -294,20 +311,9 @@ def createOrInclude(value, target=None, mode=None, user=None, group=None):
 	path = value
 	m = INC_PARSER.match(value)
 	if m:
-		# It's an include! Validate that the path exists, and refers to a regular
-		# file that is readable
-		path = m.group(1)
-
-		fullPath = os.path.normpath(CONFIG_DIR + "/" + path)
-		fullPath = os.path.realpath(fullPath)
-		if os.path.commonpath([CONF_DIR, fullPath]) == "/":
-			fail("The given path [%s] overflows from the configuration path" % (path))
-		path = fullPath
-
-		# The path must exist, refer to a regualr file, and the file
-		# must be readable.
-
-		path = assertFile(path)
+		# It's an include! Validate that the path exists, refers to a regular
+		# file that is readable, and does not overflow the config directory
+		path = assertConfigFile(os.path.normpath(CONFIG_DIR + "/" + m.group(1)))
 		if target is None:
 			path = copyToTemp(path)
 		else:
@@ -548,41 +554,59 @@ def renderSsl(general, ssl):
 		return
 
 	print("Processing the SSL configuration")
+	if not os.path.exists(SSL_DIR):
+		os.mkdir(SSL_DIR, mode=0o750)
+		shutil.chown(SSL_DIR, "root", SSL_GID)
 
 	cert = ssl.get("cert")
 	key = ssl.get("key")
 
 	if not cert and not key:
-		if cert is None:
-			cert = DEFAULT_CERT
+		# No certificates set explicitly, try the defaults
+		cert = SSL_DEFAULT_CERT
+		key = SSL_DEFAULT_KEY
 
-		if key is None:
-			key = DEFAULT_KEY
+		try:
+			# If both default certificates are there, we validate them
+			# and keep going
+			if assertFile(cert, True) and assertFile(key, True):
+				try:
+					ensurePEMValid(cert, PATH_CERT, mode=0o644, user="root", group=SSL_GID)
+				except Exception as e:
+					fail("The given certificate is not valid: %s" % (strExc(e)))
 
-		print("No certificate information found - cannot configure SSL")
-		return
+				try:
+					ensurePEMValid(key, PATH_KEY, True, mode=0o640, user="root", group=SSL_GID)
+				except Exception as e:
+					fail("The given private key is not valid: %s" % (strExc(e)))
 
-	if not cert or not key:
+				if not checkPEMCorrelation(PATH_KEY, PATH_CERT):
+					fail("The private key and certificate did not match up with one another")
+			else:
+				print("No certificate information found - cannot configure SSL")
+				return
+		except Exception as e:
+			fail("Unable to configure SSL using the default certificates:" % (strExc(e)))
+
+		if not checkPEMCorrelation(PATH_KEY, PATH_CERT):
+			fail("The private key and certificate did not match up with one another")
+	elif not cert or not key:
 		fail("Cannot configure SSL properly - you must provide both the certificate and key files or data")
+	else:
+		# Ok we have a certificate and a key, so put them
+		# in PATH_CERT and PATH_KEY respectively
+		try:
+			ensurePEMValid(cert, PATH_CERT, mode=0o644, user="root", group=SSL_GID)
+		except Exception as e:
+			fail("The given certificate is not valid: %s" % (strExc(e)))
 
-	if not os.path.exists(SSL_DIR):
-		os.mkdir(SSL_DIR, mode=0o750)
-		shutil.chown(SSL_DIR, "root", SSL_GID)
+		try:
+			ensurePEMValid(key, PATH_KEY, True, mode=0o640, user="root", group=SSL_GID)
+		except Exception as e:
+			fail("The given private key is not valid: %s" % (strExc(e)))
 
-	# Ok we have a certificate and a key, so put them
-	# in PATH_CERT and PATH_KEY respectively
-	try:
-		ensurePEMValid(cert, PATH_CERT, mode=0o644, user="root", group=SSL_GID)
-	except Exception as e:
-		fail("The given certificate is not valid: %s" % (strExc(e)))
-
-	try:
-		ensurePEMValid(key, PATH_KEY, True, mode=0o640, user="root", group=SSL_GID)
-	except Exception as e:
-		fail("The given private key is not valid: %s" % (strExc(e)))
-
-	if not checkPEMCorrelation(PATH_KEY, PATH_CERT):
-		fail("The private key and certificate did not match up with one another")
+		if not checkPEMCorrelation(PATH_KEY, PATH_CERT):
+			fail("The private key and certificate did not match up with one another")
 
 	# Now compute the Certification Authorities
 	print("Rendering the CA lists into [%s]" % (PATH_CA))
@@ -592,6 +616,12 @@ def renderSsl(general, ssl):
 		for v in ca:
 			newCa += [ensurePEMValid(v)]
 	ca = newCa
+
+	# Is there are no CAs given, and there's a default one, 
+	# then use that
+	if (len(ca) < 1) and assertFile(SSL_DEFAULT_CA):
+		ca = [ensurePEMValid(SSL_DEFAULT_CA)]
+
 	if len(ca) > 0:
 		try:
 			concatToTarget(ca, PATH_CA, user="root", group=SSL_GID, mode=0o644)
@@ -604,25 +634,34 @@ def renderSsl(general, ssl):
 		except FileNotFoundError:
 			pass
 
+	#
+	# TODO: Disable this until we figure out how to cleanly handle the CRLs
+	#
 	# Now compute the Certificate Revocation Lists
-	print("Rendering the CRL lists into [%s]" % (PATH_CRL))
-	newCrl = []
-	crl = ssl.get("crl")
-	if crl:
-		for v in crl:
-			newCrl += [ensurePEMValid(v)]
-	crl = newCrl
-	if len(crl) > 0:
-		try:
-			concatToTarget(crl, PATH_CRL, user="root", group=SSL_GID, mode=0o644)
-		except Exception as e:
-			fail("Failed to concatenate the CRL files from %s: %s" % (ca, strExc(e)))
-	else:
-		print("No CRL list given, clearing out the existing one")
-		try:
-			os.remove(PATH_CRL)
-		except FileNotFoundError:
-			pass
+	# print("Rendering the CRL lists into [%s]" % (PATH_CRL))
+	#newCrl = []
+	#crl = ssl.get("crl")
+	#if crl:
+	#	for v in crl:
+	#		newCrl += [ensurePEMValid(v)]
+	#crl = newCrl
+
+	# Is there are no CAs given, and there's a default one, 
+	# then use that
+	#if (len(crl) < 1) and assertFile(SSL_DEFAULT_CRL):
+	#	crl = [ensurePEMValid(SSL_DEFAULT_CRL)]
+
+	#if len(crl) > 0:
+	#	try:
+	#		concatToTarget(crl, PATH_CRL, user="root", group=SSL_GID, mode=0o644)
+	#	except Exception as e:
+	#		fail("Failed to concatenate the CRL files from %s: %s" % (ca, strExc(e)))
+	#else:
+	#	print("No CRL list given, clearing out the existing one")
+	#	try:
+	#		os.remove(PATH_CRL)
+	#	except FileNotFoundError:
+	#		pass
 
 	renderTemplate("SSL", SSL_TEMPLATE, SSL_TEMPLATE_TARGET, "root", "root", 0o644)
 
