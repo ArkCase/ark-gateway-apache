@@ -1,28 +1,28 @@
 <IfModule mod_ssl.c>
 	<VirtualHost _default_:443>
-		ServerAdmin {{ coalesce .ssl.serverAdmin (.main).serverAdmin "webmaster@localhost" | quote }}
+		ServerAdmin {{ (coalesce .ssl .main).serverAdmin "webmaster@localhost" | quote }}
 
-		DocumentRoot {{ coalesce .ssl.documentRoot (.main).documentRoot "/var/www/html" | quote }}
+		DocumentRoot {{ (coalesce .ssl .main).documentRoot "/var/www/html" | quote }}
 
 		# Available loglevels: trace8, ..., trace1, debug, info, notice, warn,
 		# error, crit, alert, emerg.
 		# It is also possible to configure the loglevel for particular
 		# modules, e.g.
-		{{- if (.ssl.log).level }}
+		{{- if ((.ssl).log).level }}
 		LogLevel {{ .ssl.log.level }}
 		{{- else }}
 		#LogLevel info ssl:warn
 		{{- end }}
 
-		ErrorLog {{ coalesce (.ssl.log).error "${APACHE_LOG_DIR}/error.log" }}
-		CustomLog {{ coalesce (.ssl.log).custom "${APACHE_LOG_DIR}/access.log combined" }}
+		ErrorLog {{ coalesce ((.ssl).log).error "${APACHE_LOG_DIR}/error.log" }}
+		CustomLog {{ coalesce ((.ssl).log).custom "${APACHE_LOG_DIR}/access.log combined" }}
 
 		# For most configuration files from conf-available/, which are
 		# enabled or disabled at a global level, it is possible to
 		# include a line for only one particular virtual host. For example the
 		# following line enables the CGI configuration for this host only
 		# after it has been globally disabled with "a2disconf".
-		{{- if .ssl.includes }}
+		{{- if (.ssl).includes }}
 		{{- range .ssl.includes }}
 		Include {{ . | quote }}
 		{{- end }}
@@ -80,7 +80,7 @@
 		#   none, optional, require and optional_no_ca.  Depth is a
 		#   number which specifies how deeply to verify the certificate
 		#   issuer chain before deciding the certificate is not valid.
-		{{- if .ssl.client }}
+		{{- if (.ssl).client }}
 		SSLVerifyClient {{ coalesce .ssl.client.verify "require" }}
 		SSLVerifyDepth  {{ int (coalesce .ssl.client.depth "10") }}
 		{{- else }}
@@ -111,26 +111,26 @@
 		#   o OptRenegotiate:
 		#	 This enables optimized SSL connection renegotiation handling when SSL
 		#	 directives are used in per-directory context.
-		{{- if .ssl.options }}
-		SSLOptions {{- range .ssl.options }} {{ . }}{{- end }}
+		{{- if (.ssl).options }}
+		SSLOptions {{- range (.ssl).options }} {{ . }}{{- end }}
 		{{- else }}
 		#SSLOptions +FakeBasicAuth +ExportCertData +StrictRequire
 		{{- end }}
-		{{- if (.ssl.sections).filesMatch }}
+		{{- if ((.ssl).sections).filesMatch }}
 		{{ .ssl.sections.filesMatch }}
 		{{- else }}
 		<FilesMatch "\.(cgi|shtml|phtml|php)$">
 				SSLOptions +StdEnvVars
 		</FilesMatch>
 		{{- end }}
-		{{- if (.ssl.sections).directory }}
+		{{- if ((.ssl).sections).directory }}
 		{{ .ssl.sections.directory }}
 		{{- else }}
 		<Directory /usr/lib/cgi-bin>
 				SSLOptions +StdEnvVars
 		</Directory>
 		{{- end }}
-		{{- if (.ssl.sections).other }}
+		{{- if ((.ssl).sections).other }}
 		{{ .ssl.sections.other }}
 		{{- end }}
 
@@ -158,7 +158,7 @@
 		#   Similarly, one has to force some clients to use HTTP/1.0 to workaround
 		#   their broken HTTP/1.1 implementation. Use variables "downgrade-1.0" and
 		#   "force-response-1.0" for this.
-		{{- if (.ssl.sections).browserMatch }}
+		{{- if ((.ssl).sections).browserMatch }}
 		{{ .ssl.sections.browserMatch }}
 		{{- else }}
 		# BrowserMatch "MSIE [2-6]" \
