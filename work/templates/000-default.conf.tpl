@@ -30,8 +30,8 @@
 	# include a line for only one particular virtual host. For example the
 	# following line enables the CGI configuration for this host only
 	# after it has been globally disabled with "a2disconf".
-	{{- if .ssl.includes }}
-	{{- range .ssl.includes }}
+	{{- if (.main).includes }}
+	{{- range (.main).includes }}
 	Include {{ . | quote }}
 	{{- end }}
 	{{- else }}
