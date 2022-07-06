@@ -102,8 +102,7 @@ KeepAlive {{ default "On" (.main).keepAlive }}
 # during a persistent connection. Set to 0 to allow an unlimited amount.
 # We recommend you leave this number high, for maximum performance.
 #
-MaxKeepAliveRequests 100
-KeepAlive {{ int (default 100 (.main).maxKeepAliveRequests) }}
+MaxKeepAliveRequests {{ int (default 100 (.main).maxKeepAliveRequests) }}
 
 #
 # KeepAliveTimeout: Number of seconds to wait for the next request from the
