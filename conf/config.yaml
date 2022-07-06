@@ -1,4 +1,8 @@
+# NOTE: When using inc:${path}, the path will be interpreted as relative to /conf, with no possibility
+#       of overflowing outside that sandbox via relative components (i.e. ".."). This is by design and
+#       will not change, for security reasons
 ssl:
+  enabled: boolean
   cert: inc:${certFilePath}-or-pemString
   key: inc:${certKeyFilePath}-or-pemString
   ca:
@@ -38,40 +42,47 @@ ssl:
   #     ... other sections that need to go here ...
 
 modules:
-  # Flag that indicates whether the defaults should be cleared prior
-  # to applying the configurations
-  clearDefaults: true
-  # If using inc:${absolutePath} here, then the contents will be used for the .conf file.
-  # Must use the other syntax to provide the contents of both files
-  module-1: boolean-or-inc:${absolutePath}
+  # Flag that indicates whether the default links should be removed prior
+  # to applying the configurations (default is false)
+  removeDefaults: true
+
+  # If using inc:${path} here, then the contents will be used for the .conf file and
+  # "add" will be assumed for the operation.
+  # Must use the other syntax to provide the contents of all files
+  # Operation is either "add" or "remove" (case-insensitive)
+  module-1: operation-or-inc:${path}
   module-2:
     enabled: boolean
     files:
       # use "conf" for the .conf file, "load" for the .load file, etc....
       conf: |
-        contents of the module's configuration (can also use inc:${absolutePath} here)
+        contents of the module's configuration (can also use inc:${path} here)
       load: |
         contents of the module's load statement (if not given, the existing load file will be used,
-        can also use inc:${absolutePath} here)
+        can also use inc:${path} here)
   # ...
   module-N: ...
 
 sites:
-  site-1: boolean-or-inc:${absolutePath}
+  # Flag that indicates whether the default links should be removed prior
+  # to applying the configurations (default is false)
+  removeDefaults: false
+
+  site-1: operation-or-inc:${path}
   site-2:
     enabled: boolean
     files:
       conf: |
-        contents of the site configuration (can also use inc:${absolutePath} here)
+        contents of the site configuration (can also use inc:${path} here)
   # ...
   site-N: ...
 
 confs:
-  conf-1: boolean-or-inc:${absolutePath}
+  conf-1: operation-or-inc:${path}-or-file-contents
   conf-2:
     enabled: boolean
     files:
       conf: |
-        contents of the additional configuration (can also use inc:${absolutePath} here)
+        contents of the additional configuration (can also use inc:${path} here)
   # ...
   conf-N: ...
