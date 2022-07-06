@@ -28,7 +28,6 @@ ENV APACHE_GID="${GID}"
 ENV SSL_GID="${SSL_GID}"
 ENV BAK_DIR="/conf/.backups"
 ENV WORK_DIR="/work"
-ENV WORK_TMP="${WORK_DIR}/.tmp"
 ENV WORK_TPL="${WORK_DIR}/templates"
 RUN apt-get update && apt-get -y dist-upgrade
 RUN apt-get install -y \
@@ -39,14 +38,14 @@ RUN apt-get install -y \
         wget
 RUN curl -L -o /usr/local/bin/gucci "${GUCCI_SRC}" && chmod a+rx /usr/local/bin/gucci
 RUN usermod -a -G "${SSL_GID}" "${UID}"
-RUN mkdir -p "${WORK_TMP}" "${WORK_TPL}"
+RUN mkdir -p "${WORK_TPL}"
 COPY "entrypoint" "reload" "/"
 COPY "work" "${WORK_DIR}"
 RUN chown -R "root:" "${WORK_DIR}" && chmod 0750 "${WORK_DIR}"
 RUN mkdir -p "${BAK_DIR}" && chown -R "root:" "${BAK_DIR}" && chmod 0750 "${BAK_DIR}"
 
 # This directory will be rendered via configuration
-RUN rm -rf "/etc/apache2"
+RUN mv "/etc/apache2" "/etc/apache2.default" && ln -s "apache2.default" "/etc/apache2"
 
 #
 # Final parameters

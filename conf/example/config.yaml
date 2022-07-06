@@ -2,10 +2,10 @@ main:
   # serverRoot: "/var/www/www"
 
 ssl:
-  cert: inc:examples/cert.pem
-  key: inc:examples/key.pem
+  cert: inc:cert.pem
+  key: inc:key.pem
   ca:
-    - inc:examples/ca.1
+    - inc:ca.1
     - |
       -----BEGIN CERTIFICATE-----
       MIIFQjCCBCqgAwIBAgIBEjANBgkqhkiG9w0BAQsFADCBtzELMAkGA1UEBhMCQ1Ix
@@ -40,8 +40,8 @@ ssl:
       -----END CERTIFICATE-----
 
   crl:
-    - inc:examples/crl.1
-    - inc:examples/crl.2
+    - inc:crl.1
+    - inc:crl.2
     # ...
     - |
       -----BEGIN CERTIFICATE-----
