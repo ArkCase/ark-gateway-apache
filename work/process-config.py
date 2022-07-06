@@ -357,6 +357,22 @@ def ensurePEMValid(value, target=None, asKey=False, mode=None, user=None, group=
 
 	return info["path"]
 
+def checkPEMCorrelation(key, cert):
+	# Get the private key's modulus
+	keyResult = subprocess.run([OPENSSL_EXE, "rsa", "-modulus", "-noout", "-in", key, "-passin", "pass:"])
+	# If this didn't return 0, then it's not a valid private key
+	if keyResult.returncode != 0:
+		return False
+
+	# Get the certificate's modulus
+	certResult = subprocess.run([OPENSSL_EXE, "x509", "-modulus", "-noout", "-in", cert])
+	# If this didn't return 0, then it's not a valid certificate
+	if certResult.returncode != 0:
+		return False
+
+	# The moduli must be the same for them to correspond with one another
+	return (keyResult.stdout == certResult.stdout)
+
 def listAvailable(src, ext):
 	if not ext or not src:
 		return []
@@ -561,6 +577,9 @@ def renderSsl(general, ssl):
 		ensurePEMValid(key, PATH_KEY, True, mode=0o640, user="root", group=SSL_GID)
 	except Exception as e:
 		fail("The given private key is not valid: %s" % (strExc(e)))
+
+	if not checkPEMCorrelation(PATH_KEY, PATH_CERT):
+		fail("The private key and certificate did not match up with one another")
 
 	# Now compute the Certification Authorities
 	print("Rendering the CA lists into [%s]" % (PATH_CA))
