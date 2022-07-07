@@ -1,8 +1,8 @@
 <IfModule mod_ssl.c>
 	<VirtualHost _default_:443>
-		ServerAdmin {{ (coalesce .ssl .main).serverAdmin "webmaster@localhost" | quote }}
+		ServerAdmin {{ coalesce (.ssl).serverAdmin (.main).serverAdmin "webmaster@localhost" | quote }}
 
-		DocumentRoot {{ (coalesce .ssl .main).documentRoot "/var/www/html" | quote }}
+		DocumentRoot {{ coalesce (.ssl).documentRoot (.main).documentRoot "/var/www/html" | quote }}
 
 		# Available loglevels: trace8, ..., trace1, debug, info, notice, warn,
 		# error, crit, alert, emerg.
