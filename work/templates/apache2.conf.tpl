@@ -224,4 +224,14 @@ IncludeOptional conf-enabled/*.conf
 # Include the virtual host configurations:
 IncludeOptional sites-enabled/*.conf
 
+#
+# Extra global settings lines added in the modules configuration
+#
+{{- range (.main).extraSettings }}
+{{ . }}
+{{- end }}
+#
+# End extra directives
+#
+
 # vim: syntax=apache ts=4 sw=4 sts=4 sr noet

@@ -167,7 +167,7 @@
 		{{- end }}
 
 		#
-		# Extra SSL settings to apply to the default VHost
+		# Extra SSL settings lines added in the modules configuration to apply to the default VHost
 		#
 		{{- range (.ssl).extraSettings }}
 		{{ . }}
