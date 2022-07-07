@@ -72,6 +72,8 @@ SSL_MODULE_LOAD_LINK = "ssl.load"
 SSL_MODULE_LOAD_SRC = MODS_AVAILABLE + "/" + SSL_MODULE_LOAD_LINK
 SSL_MODULE_LOAD_LINK = MODS_ENABLED + "/" + SSL_MODULE_LOAD_LINK
 
+SSL_DEFAULT_CACHES = [ "dbm", "memcache", "redis", "shmcb" ]
+
 SSL_DEFAULT_CERT = "inc:/cert.pem"
 SSL_DEFAULT_KEY = "inc:/key.pem"
 SSL_DEFAULT_CA = "inc:/ca.pem"
@@ -785,13 +787,33 @@ def renderSsl(general, ssl):
 	#	except FileNotFoundError:
 	#		pass
 
-	renderTemplate("SSL", SSL_TEMPLATE, SSL_TEMPLATE_TARGET, "root", "root", 0o644)
-	print("\tCreating the SSL module configuration")
-	renderTemplate("SSL module", SSL_MODULE_TEMPLATE, SSL_MODULE_TEMPLATE_TARGET, "root", "root", 0o644)
+	if not os.path.exists(SSL_MODULE_TEMPLATE_TARGET):
+		print("Creating the SSL module configuration")
+		renderTemplate("SSL module", SSL_MODULE_TEMPLATE, SSL_MODULE_TEMPLATE_TARGET, "root", "root", 0o644)
 
 	# If we haven't already created it, we deploy the module loader
-	print("\tCreating the link for the SSL module loader")
-	os.symlink(os.path.relpath(SSL_MODULE_LOAD_SRC, MODS_ENABLED), SSL_MODULE_LOAD_LINK)
+	if not os.path.exists(SSL_MODULE_LOAD_LINK):
+		if os.path.lexists(SSL_MODULE_LOAD_LINK):
+			os.remove(SSL_MODULE_LOAD_LINK)
+		print("Creating the link for the SSL module loader")
+		os.symlink(os.path.relpath(SSL_MODULE_LOAD_SRC, MODS_ENABLED), SSL_MODULE_LOAD_LINK)
+
+	if not os.path.exists(SSL_TEMPLATE_TARGET):
+		print("Creating the main SSL VHost configuration")
+		renderTemplate("SSL", SSL_TEMPLATE, SSL_TEMPLATE_TARGET, "root", "root", 0o644)
+
+	#
+	# Finally, enable the cache modules that mod_ssl may require
+	#
+	for cache in SSL_DEFAULT_CACHES:
+		name = "socache_" + cache + ".load"
+		source = os.path.join(MODS_AVAILABLE, name)
+		target = os.path.join(MODS_ENABLED, name)
+		if not os.path.exists(target):
+			if os.path.lexists(target):
+				os.remove(target)
+			print("Creating the link for SSL %s cache support" % (cache))
+			os.symlink(os.path.relpath(source, MODS_ENABLED), target)
 
 def renderMain(general, ssl):
 	renderTemplate("main", MAIN_TEMPLATE, MAIN_TEMPLATE_TARGET, "root", "root", 0o644)
