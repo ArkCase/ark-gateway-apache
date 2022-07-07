@@ -549,7 +549,8 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 			# If the value is a string, then:
 			#   * if the value is an ADD value, we find all the files with the prefix "trueName"
 			#     in available, and create links for them in "enabled" regardless of extension
-			#   * If the value is an "inc:${...}", we do the file inclusion directly into "enabled"
+			#   * If the value is an "inc:${...}", we do the file inclusion directly into "enabled", using
+			#     mainExt as the extension
 			#   * Otherwise, assume the value is the contents of the mainExt file, and find all other
 			#     files with extensions in "available", and link them into "enabled"
 			add = isAddValue(value)
@@ -566,12 +567,28 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 		if add:
 			continue
 
+		# Prepare this value for reuse...
+		baseTarget = os.path.join(enabled, trueName)
+
+		# It's not a simple add, but we need to check if it's a string. If so, it's either
+		# an inc:${...} or the actual mainExt file's contents...
+		if isinstance(value, TYPE_STRING):
+			target = baseTarget + "." + mainExt
+			info = createOrInclude(value, target, 0o644, "root", "root")
+			action = "Created"
+			sourceDesc = "inlined content"
+			if info["included"]:
+				action = "Included"
+				sourceDesc = "the referenced file"
+			print("\t%s custom data at [%s] from %s" % (action, target, sourceDesc))
+			continue
+
 		# Otherwise, we have to create (or overwrite) any custom files based on the remaining
 		# dictionary contents. Each key represents an extension to be overwritten, and the value
 		# represents the contents of the file
 		for ext in value:
 			content = str(value[ext])
-			target = os.path.join(enabled, trueName) + "." + ext
+			target = baseTarget + "." + ext
 			info = createOrInclude(content, target, 0o644, "root", "root")
 			action = "Created"
 			sourceDesc = "inlined content"
