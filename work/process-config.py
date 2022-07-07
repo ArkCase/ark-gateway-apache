@@ -5,23 +5,20 @@
 # Import the base libraries
 #
 import datetime
-#import grp
+import glob
 import os
-#import pwd
 import re
 import shutil
-#import stat
 import ssl
 import subprocess
 import sys
 import tempfile
-#import time
 import traceback
 
-TYPE_LIST = type([])
-TYPE_STRING = type("")
-TYPE_DICT = type({})
-TYPE_BOOL = type(True)
+TYPE_LIST = list
+TYPE_STRING = str
+TYPE_DICT = dict
+TYPE_BOOL = bool
 
 # First things first: create the directory where this configuration will be stored, and
 # extract the template TAR file onto it.
@@ -181,6 +178,9 @@ class InvalidCertificateKey(Exception):
 	pass
 
 class InvalidCertificationAuthority(Exception):
+	pass
+
+class MissingConfigurationFiles(Exception):
 	pass
 
 class Failure(Exception):
@@ -400,10 +400,57 @@ def listAvailable(src, ext):
 	ret.sort()
 	return ret
 
+ADD_VALUES = dict.fromkeys(["add",  "enabled", "enable", "on"], True)
+DEL_VALUES = dict.fromkeys(["remove", "delete",  "off", "disabled", "disable"], False)
+def isValueFromMap(value, candidates):
+	# If there's no value to be analyzed, we return the default
+	# we were given
+	if value is None:
+		return False
+
+	# Now, see if this value is one of the true-values. If not, then
+	# we assume it's a false-value
+	value = candidates.get(str(value).lower())
+	if value is None:
+		value = False
+	return value
+
+def isAddValue(value):
+	return isValueFromMap(value, ADD_VALUES)
+
+def isRemoveValue(value):
+	return isValueFromMap(value, DEL_VALUES)
+
+def removeExisting(directory, basename):
+	# Do the removal from "directory" - go through all the extensions
+	for f in glob.glob(os.path.join(directory, basename) + ".*"):
+		(p, e) = os.path.splitext(f)
+		if os.path.basename(p) != basename:
+			continue
+		try:
+			print("\tRemoving [%s]" % (f))
+			os.remove(f)
+		except FileNotFoundError:
+			pass
+
+def linkAvailable(basename, source, target):
+	count = 0
+	for f in glob.glob(os.path.join(source, basename) + ".*"):
+		(p, e) = os.path.splitext(f)
+		if os.path.basename(p) != basename:
+			continue
+		rel = os.path.relpath(f, target)
+		print("\tLinking [%s] as [%s] for %s..." % (rel, target, basename))
+		os.symlink(rel, target)
+		count += 1
+	return (count > 0)
+
 def processLinkDirectory(general, label, name, data, available, enabled, mainExt, extraExt = [], extraRequired = False):
 	if not data:
 		print("No %s configurations to process, skipping this step" % (label))
 		return None
+
+	trueNames = {}
 
 	# If we've been asked to remove the defaults, we do so
 	removeDefaults = toBoolean(data.pop("removeDefaults", "false"))
@@ -420,16 +467,118 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 		# and do so. If an object we've been asked to remove doesn't exist, this isn't
 		# a problem and will only result in a warning being printed.
 		#
-		# Objects who have "enabled" set to "false" must also be removed if present
+		# Objects who have "enabled" set to "false" must also be removed if present.
+		#
+		# An object will be removed if its "enabled" attribute is a boolean false,
+		# or if its value is one of the strings "off", "remove", "delete", or "disable"
+		# (case-insensitive)
 
-		# DO THE REMOVE THING!
-		pass
+		for key in data:
+			value = data[key]
+
+			# First, identify if we're supposed to remove this
+			if isinstance(value, TYPE_DICT):
+				remove = (not toBoolean(data.pop("enabled", True)))
+			else:
+				# If it's a string it can either be an ADD value, a REMOVE value, or the actual
+				# contents of the main file (inc:${...} is supported). We only remove if it's
+				# a REMOVE value
+				remove = isRemoveValue(str(value).lower())
+
+			if not remove:
+				continue
+
+			# Next, do the actual removal. Also remove the object from the
+			# data as it's been processed and should no longer be considered
+			# for further action
+			data.pop(key)
+
+			# Just in case we need to use a different name for the module
+			trueName = data.pop("trueName", key)
+			if trueName in trueNames:
+				# Duplicate trueName values are not allowed
+				print("WARNING: duplicate 'trueName' [%s] from key [%s], already used by [%s]" % (trueName, key, trueNames[trueName]))
+				continue
+
+			# Mark the trueName as used (and by whom)
+			trueNames[trueName] = key
+			removeExisting(enabled, trueName)
 
 	# Ok so at this point we need to start identifying which objects we've been asked to
 	# add from available into enabled. Missing objects are an error, obviously. Also
-	# respect the "enabled" flag and skip adding those
+	# respect the "enabled" flag and skip adding those. Remove existing ones just
+	# in case
+	for key in data:
+		value = data[key]
 
-	# DO THE ADD THING!
+		# First, identify if we're supposed to add this
+		if isinstance(value, TYPE_DICT):
+			add = toBoolean(data.pop("enabled", True))
+		else:
+			# If it's a string it can either be an ADD value, a REMOVE value, or the actual
+			# contents of the main file (inc:${...} is supported). We only add if it's
+			# not a REMOVE value
+			value = str(value)
+			add = (not isRemoveValue(value.lower()))
+
+		if not add:
+			# No need to add, just skip it
+			continue
+
+		# Just in case we need to use a different name for the module
+		trueName = data.pop("trueName", key)
+		if trueName in trueNames:
+			# Duplicate trueName values are not allowed
+			print("WARNING: duplicate 'trueName' [%s] from key [%s], already used by [%s]" % (trueName, key, trueNames[trueName]))
+			continue
+
+		# Mark the trueName as used (and by whom)
+		trueNames[trueName] = key
+		removeExisting(enabled, trueName)
+
+		# Step 1: we figure out what we're supposed to do.
+		if isinstance(value, TYPE_DICT):
+			# If the value is a dict(), then:
+			#   * we know it's enabled, as we checked that above
+			#   * if there are no other entries, then we behave as if it's a simple ADD ("enabled"
+			#     was popped above, so testing for emptyness should do the trick)
+			#   * if there are other entries, we assume their key is the file's extension, and
+			#     we create the file with the value as its contents (inc:${...} supported)
+			add = (not data)
+		else:
+			# If the value is a string, then:
+			#   * if the value is an ADD value, we find all the files with the prefix "trueName"
+			#     in available, and create links for them in "enabled" regardless of extension
+			#   * If the value is an "inc:${...}", we do the file inclusion directly into "enabled"
+			#   * Otherwise, assume the value is the contents of the mainExt file, and find all other
+			#     files with extensions in "available", and link them into "enabled"
+			add = isAddValue(value)
+
+		# Step 2: always create any existing links
+		if not linkAvailable(trueName, available, enabled):
+			# We only explode if this is a "simple" ADD operation (i.e. don't create custom files, don't
+			# inc:${...} anything, etc.  Just "add existing" ...
+			if add:
+				print("ERROR: No %s configuration named [%s] exists in [%s]" % (label, trueName, available))
+				raise MissingConfigurationFiles(os.path.join(available, trueName) + ".*")
+
+		# At this point, if we're a simple add operation our work is done.
+		if add:
+			continue
+
+		# Otherwise, we have to create (or overwrite) any custom files based on the remaining
+		# dictionary contents. Each key represents an extension to be overwritten, and the value
+		# represents the contents of the file
+		for ext in value:
+			content = str(value[ext])
+			target = os.path.join(enabled, trueName) + "." + ext
+			info = createOrInclude(content, target, 0o644, "root", "root")
+			action = "Created"
+			sourceDesc = "inlined content"
+			if info["included"]:
+				action = "Included"
+				sourceDesc = "the referenced file"
+			print("\t%s custom data at [%s] from %s" % (action, target, sourceDesc))
 
 	#
 	# TA-DA!! We're done! The "enabled" directory should contain only the links and/or
@@ -437,110 +586,6 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 	#
 
 	return
-
-
-	#
-	# Ok so here's the old algorithm ...
-	#
-
-	# First things first - make sure that the requested configuration is viable
-	# available = dict.fromkeys(listAvailable(available, extensions), True)
-	reqMain = dict.fromkeys(listAvailable(available, mainExt), True)
-	reqExtra = dict.fromkeys(listAvailable(available, extraExt), True)
-
-	missing = []
-	simpleLinks = []
-	includes = {}
-	generations = {}
-	for key in data:
-		value = data[key]
-
-		# First things first: is this value a string?
-		if isinstance(value, TYPE_STRING):
-			# Is this a boolean-value?
-			if toBoolean(value):
-				# This is a boolean-value, so stow it to create the link(s)
-				# to the available file(s) into the target as needed
-				simpleLinks += [key]
-				continue
-
-			# Is it an include?
-			m = INC_PARSER.match(value)
-			if m:
-				# It's an include! Validate that the path exists,
-				# and refers to a regular file that is readable,
-				# and stow it for inclusion into the target
-				includes[key] = { mainExt : m.group(1) }
-				continue
-
-			# This must be the contents of the main file, so
-			# stow it for storage into the target
-			generations[key] = { mainExt : value }
-			continue
-
-		# If it's a dictionary, then it must be the "longform" structure
-		if isinstance(value, TYPE_DICT):
-
-			# First things first: is it enabled?
-			enabled = toBoolean(value.pop("enabled", "true"))
-
-			# If it's not enabled, simply skip it and do nothing
-			if not enabled:
-				continue
-
-			# It's enabled, so process the contents
-			files = values.get("files")
-			if files is None:
-				# No files defined, so treat it as a simple include
-				simpleLinks += [key]
-				continue
-
-			if not isinstance(files, TYPE_DICT):
-				fail("The 'files:' sections must be dictionaries whose keys are the files' extensions to be created (%s %s)" % (name, key))
-
-			# We have files to create, so stow them for creation
-			for ext in files:
-				value = str(files[ext])
-
-				# Is it an include?
-				m = INC_PARSER.match(value)
-				if m:
-					# It's an include! Validate that the path exists,
-					# and refers to a regular file that is readable,
-					# and stow it for inclusion into the target
-					includes[key] = { ext : m.group(1) }
-					continue
-
-				# This must be the contents of the main file, so
-				# stow it for storage into the target
-				generations[key] = { ext : value }
-				continue
-
-			continue
-
-		fail("Invalid format for the %s.%s section - wasn't a string, nor the longform dict" % (name, key))
-
-	# Ok, so at this point...
-	#   * simpleLinks contains the list of names for whom all files will just be
-	#     linked from available into enabled. Missing sources are an error
-	#
-	#   * includes contains a dict whose keys are the name of the object to be
-	#     created/linked, and the value is a dict whose keys are the file extensions
-	#     to be created, with the value being the file whose contents should be stored there.
-	#     If there's a missing extension from the ones listed, then a simple link must be possible
-	#     from available into enabled. Missing sources are an error
-	#
-	#   * generations contains a dict whose keys are the name of the object to be
-	#     created, and the value is a dict whose keys are the file extensions
-	#     to be created, with the value being the contents of the files that need creating.
-	#     If there's a missing extension from the ones listed, then a simple link must be possible
-	#     from available into enabled. Missing sources are an error
-	#
-	# The next step is to validate that all these operations would succeed, and start accumulating the lambdas
-	# that will perform the actual work at the very end once the entire configuration is validated
-	print("simpleLinks for %s: %s" % (name, str(simpleLinks)))
-	print("includes for %s: %s" % (name, str(includes)))
-	print("generations for %s: %s" % (name, str(generations)))
 
 def processModules(general, modules):
 	print("Processing the module configurations")
