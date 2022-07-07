@@ -100,30 +100,68 @@ ssl:
   #     downgrade-1.0 force-response-1.0
   #   other: |
   #     ... other sections that need to go here ...
+  # module:
+  #   randomSeed:
+  #     - startup builtin
+  #     - startup file:/dev/urandom 512
+  #     - connect builtin
+  #     - connect file:/dev/urandom 512
+  #   addType:
+  #     - application/x-x509-ca-cert .crt
+  #     - application/x-pkcs7-crl .crl
+  #   passPhraseDialog: exec:/usr/share/apache2/ask-for-passphrase
+  #   sessionCache:
+  #     engine: shmcb:${APACHE_RUN_DIR}/ssl_scache(512000)
+  #     timeout: 300
+  #   mutex: file:${APACHE_LOCK_DIR}/ssl_mutex ssl-cache
+  #   cipherSuite: HIGH:!aNULL
+  #   honorCipherOrder: on
+  #   protocol:
+  #     - all
+  #     - -SSLv3
+  #   insecureRenegotiation: On
+  #   strictSNIVHostCheck: On
 
 modules:
-  module-1: boolean
-  module-2:
-    enabled: boolean
+  alias: add
+  auth_basic:
+    load: |
+      # This is example load data for auth_basic
+      # Depends: authn_core
+      LoadModule auth_basic_module /usr/lib/apache2/modules/mod_auth_basic.so
     conf: |
-      contents of the module's configuration
-  # ...
-  module-N: ...
+      # This is example configuration data for auth_basic
+      # this file isn't used, it's just added as a demonstrator
+    crap: |
+      # This is example crap file for auth_basic
+      # this file isn't used, it's just added as a demonstrator
+  autoindex: remove
+  dir: |
+    # This file came from the config.yaml file
+    <IfModule mod_dir.c>
+    DirectoryIndex index.html index.cgi index.pl index.php index.xhtml index.htm
+    </IfModule>
+  weird-name-1:
+    enabled: false
+  weird-name-2:
+    trueName: ssl
+    enabled: true
+  ssl: this should break and be ignored
 
-sites:
-  site-1: boolean
-  site-2:
-    enabled: boolean
-    conf: |
-      contents of the site configuration
-  # ...
-  site-N: ...
+# sites:
+#   site-1: boolean
+#   site-2:
+#     enabled: boolean
+#     conf: |
+#       contents of the site configuration
+#   # ...
+#   site-N: ...
 
-confs:
-  conf-1: boolean
-  conf-2:
-    enabled: boolean
-    conf: |
-      contents of the additional configuration
-  # ...
-  conf-N: ...
+# confs:
+#   conf-1: boolean
+#   conf-2:
+#     enabled: boolean
+#     conf: |
+#       contents of the additional configuration
+#   # ...
+#   conf-N: ...
