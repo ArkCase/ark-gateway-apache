@@ -64,6 +64,14 @@ SSL_TEMPLATE_TARGET = "default-ssl.conf"
 SSL_TEMPLATE = TEMPLATE_DIR + "/" + SSL_TEMPLATE_TARGET + ".tpl"
 SSL_TEMPLATE_TARGET = SITES_ENABLED + "/" + SSL_TEMPLATE_TARGET
 
+SSL_MODULE_TEMPLATE_TARGET = "ssl.conf"
+SSL_MODULE_TEMPLATE = TEMPLATE_DIR + "/" + SSL_MODULE_TEMPLATE_TARGET + ".tpl"
+SSL_MODULE_TEMPLATE_TARGET = MODS_ENABLED + "/" + SSL_MODULE_TEMPLATE_TARGET
+
+SSL_MODULE_LOAD_LINK = "ssl.load"
+SSL_MODULE_LOAD_SRC = MODS_AVAILABLE + "/" + SSL_MODULE_LOAD_LINK
+SSL_MODULE_LOAD_LINK = MODS_ENABLED + "/" + SSL_MODULE_LOAD_LINK
+
 SSL_DEFAULT_CERT = "inc:/cert.pem"
 SSL_DEFAULT_KEY = "inc:/key.pem"
 SSL_DEFAULT_CA = "inc:/ca.pem"
@@ -778,8 +786,12 @@ def renderSsl(general, ssl):
 	#		pass
 
 	renderTemplate("SSL", SSL_TEMPLATE, SSL_TEMPLATE_TARGET, "root", "root", 0o644)
-	# TODO: render the template for ssl.conf, which will enable/disable ciphers, etc
-	# TODO: create the symlink for ssl.load, which should go into the modules directory
+	print("\tCreating the SSL module configuration")
+	renderTemplate("SSL module", SSL_MODULE_TEMPLATE, SSL_MODULE_TEMPLATE_TARGET, "root", "root", 0o644)
+
+	# If we haven't already created it, we deploy the module loader
+	print("\tCreating the link for the SSL module loader")
+	os.symlink(os.path.relpath(SSL_MODULE_LOAD_SRC, MODS_ENABLED), SSL_MODULE_LOAD_LINK)
 
 def renderMain(general, ssl):
 	renderTemplate("main", MAIN_TEMPLATE, MAIN_TEMPLATE_TARGET, "root", "root", 0o644)

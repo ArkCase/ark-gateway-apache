@@ -166,6 +166,16 @@
 		#		downgrade-1.0 force-response-1.0
 		{{- end }}
 
+		#
+		# Extra SSL settings to apply to the default VHost
+		#
+		{{- range (.ssl).extraSettings }}
+		{{ . }}
+		{{- end }}
+		#
+		# End extra settings
+		#
+
 	</VirtualHost>
 </IfModule>
 
