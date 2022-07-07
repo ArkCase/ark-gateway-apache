@@ -97,7 +97,7 @@ except ImportError:
 #
 def strExc(e):
 	if DEBUG:
-		return traceback.format_exc(e)
+		return traceback.format_exc()
 	return str(e)
 
 # 
@@ -141,7 +141,6 @@ def debug(msg, *args):
 #
 DRY_RUN = toBoolean(os.environ.get("DRY_RUN"))
 if DRY_RUN:
-	DEBUG = True
 	debug("WARNING: Dry run mode active")
 
 class InvalidPEMFile(Exception):
@@ -213,7 +212,7 @@ def testConfig(directory):
 	try:
 		subprocess.check_output([TEST_CONFIG_EXE, directory], stderr=subprocess.STDOUT)
 	except subprocess.CalledProcessError as e:
-		raise InvalidConfig(str(e.output))
+		raise InvalidConfig(str(e.output)) from None
 
 def assertFile(path, silent = False):
 	if not os.path.exists(path):
@@ -258,15 +257,14 @@ def writeToFile(data, target=None, mode=None, user=None, group=None):
 		else:
 			with open(target, "w") as out:
 				out.write(data)
-	except Exception as e:
+	except:
 		try:
 			os.remove(target)
-		except Exception:
+		except:
 			# We're fine ...
 			pass
-		finally:
-			# Punt the exception upward
-			raise e
+		# Punt the exception upward
+		raise
 
 	if mode:
 		os.chmod(target, mode)
@@ -401,7 +399,7 @@ def listAvailable(src, ext):
 	return ret
 
 ADD_VALUES = dict.fromkeys(["add",  "enabled", "enable", "on"], True)
-DEL_VALUES = dict.fromkeys(["remove", "delete",  "off", "disabled", "disable"], False)
+DEL_VALUES = dict.fromkeys(["remove", "delete",  "off", "disabled", "disable"], True)
 def isValueFromMap(value, candidates):
 	# If there's no value to be analyzed, we return the default
 	# we were given
@@ -440,12 +438,13 @@ def linkAvailable(basename, source, target):
 		if os.path.basename(p) != basename:
 			continue
 		rel = os.path.relpath(f, target)
-		print("\tLinking [%s] as [%s] for %s..." % (rel, target, basename))
-		os.symlink(rel, target)
+		link = os.path.join(target, os.path.basename(f))
+		print("\tLinking [%s] as [%s] for %s..." % (rel, link, basename))
+		os.symlink(rel, link)
 		count += 1
 	return (count > 0)
 
-def processLinkDirectory(general, label, name, data, available, enabled, mainExt, extraExt = [], extraRequired = False):
+def processLinkDirectory(general, label, name, data, available, enabled, mainExt):
 	if not data:
 		print("No %s configurations to process, skipping this step" % (label))
 		return None
@@ -473,6 +472,7 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 		# or if its value is one of the strings "off", "remove", "delete", or "disable"
 		# (case-insensitive)
 
+		keysToPop = []
 		for key in data:
 			value = data[key]
 
@@ -480,10 +480,13 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 			if isinstance(value, TYPE_DICT):
 				remove = (not toBoolean(data.pop("enabled", True)))
 			else:
+				# Make sure the value is a string henceforth
+				value = str(value)
+
 				# If it's a string it can either be an ADD value, a REMOVE value, or the actual
 				# contents of the main file (inc:${...} is supported). We only remove if it's
 				# a REMOVE value
-				remove = isRemoveValue(str(value).lower())
+				remove = isRemoveValue(value)
 
 			if not remove:
 				continue
@@ -491,7 +494,7 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 			# Next, do the actual removal. Also remove the object from the
 			# data as it's been processed and should no longer be considered
 			# for further action
-			data.pop(key)
+			keysToPop += [key]
 
 			# Just in case we need to use a different name for the module
 			trueName = data.pop("trueName", key)
@@ -504,6 +507,10 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 			trueNames[trueName] = key
 			removeExisting(enabled, trueName)
 
+		# Pop the keys we're meant to pop
+		for key in keysToPop:
+			data.pop(key)
+
 	# Ok so at this point we need to start identifying which objects we've been asked to
 	# add from available into enabled. Missing objects are an error, obviously. Also
 	# respect the "enabled" flag and skip adding those. Remove existing ones just
@@ -513,20 +520,18 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 
 		# First, identify if we're supposed to add this
 		if isinstance(value, TYPE_DICT):
-			add = toBoolean(data.pop("enabled", True))
+			add = toBoolean(value.pop("enabled", True))
+
+			# Just in case we need to use a different name for the module
+			trueName = value.pop("trueName", key)
 		else:
 			# If it's a string it can either be an ADD value, a REMOVE value, or the actual
 			# contents of the main file (inc:${...} is supported). We only add if it's
 			# not a REMOVE value
 			value = str(value)
-			add = (not isRemoveValue(value.lower()))
+			add = (not isRemoveValue(value))
+			trueName = key
 
-		if not add:
-			# No need to add, just skip it
-			continue
-
-		# Just in case we need to use a different name for the module
-		trueName = data.pop("trueName", key)
 		if trueName in trueNames:
 			# Duplicate trueName values are not allowed
 			print("WARNING: duplicate 'trueName' [%s] from key [%s], already used by [%s]" % (trueName, key, trueNames[trueName]))
@@ -534,9 +539,15 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 
 		# Mark the trueName as used (and by whom)
 		trueNames[trueName] = key
+
+		if not add:
+			# No need to add, just skip it
+			continue
+
+		# Step 1: Remove existing crap
 		removeExisting(enabled, trueName)
 
-		# Step 1: we figure out what we're supposed to do.
+		# Step 2: we figure out what we're supposed to do.
 		if isinstance(value, TYPE_DICT):
 			# If the value is a dict(), then:
 			#   * we know it's enabled, as we checked that above
@@ -544,7 +555,7 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 			#     was popped above, so testing for emptyness should do the trick)
 			#   * if there are other entries, we assume their key is the file's extension, and
 			#     we create the file with the value as its contents (inc:${...} supported)
-			add = (not data)
+			add = (not value)
 		else:
 			# If the value is a string, then:
 			#   * if the value is an ADD value, we find all the files with the prefix "trueName"
@@ -606,15 +617,15 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 
 def processModules(general, modules):
 	print("Processing the module configurations")
-	return processLinkDirectory(general, "module" "modules", modules, MODS_AVAILABLE, MODS_ENABLED, "conf", "load", True)
+	return processLinkDirectory(general, "module", "modules", modules, MODS_AVAILABLE, MODS_ENABLED, "conf")
 
 def processSites(general, sites):
 	print("Processing the site configurations")
-	return processLinkDirectory(general, "site", "sites", sites, SITES_AVAILABLE, SITES_ENABLED, "conf", [])
+	return processLinkDirectory(general, "site", "sites", sites, SITES_AVAILABLE, SITES_ENABLED, "conf")
 
 def processConfs(general, confs):
 	print("Processing the additional configurations")
-	return processLinkDirectory(general, "additional", "confs", confs, CONF_AVAILABLE, CONF_ENABLED, "conf", [])
+	return processLinkDirectory(general, "additional", "confs", confs, CONF_AVAILABLE, CONF_ENABLED, "conf")
 
 def renderTemplate(label, template, target, user=None, group=None, mode=None):
 	print("Rendering the %s configuration into [%s]" % (label, target))
@@ -776,11 +787,11 @@ def renderMain(general, ssl):
 def mainBlock(config, workDir):
 	yamlData = loadConfig(config)
 	sections = []
-	sections += [( "modules", "modules",    processModules }]
-	sections += [( "sites",   "sites",      processSites   }]
-	sections += [( "confs",   "additional", processConfs   }]
-	sections += [( "ssl",     "SSL",        renderSsl      }]
-	sections += [( "main",    "main",       renderMain     }]
+	sections += [( "modules", "modules",    processModules )]
+	sections += [( "sites",   "sites",      processSites   )]
+	sections += [( "confs",   "additional", processConfs   )]
+	sections += [( "ssl",     "SSL",        renderSsl      )]
+	sections += [( "main",    "main",       renderMain     )]
 
 	# First things first - extract the TAR file into the work directory
 	try:
