@@ -408,8 +408,8 @@ def listAvailable(src, ext):
 	ret.sort()
 	return ret
 
-ADD_VALUES = dict.fromkeys(["add",  "enabled", "enable", "on"], True)
-DEL_VALUES = dict.fromkeys(["remove", "delete",  "off", "disabled", "disable"], True)
+ADD_VALUES = dict.fromkeys(["add",  "enabled", "enable", "on", "true", "yes", "y"], True)
+DEL_VALUES = dict.fromkeys(["remove", "delete",  "off", "disabled", "disable", "false", "no", "n"], True)
 def isValueFromMap(value, candidates):
 	# If there's no value to be analyzed, we return the default
 	# we were given
