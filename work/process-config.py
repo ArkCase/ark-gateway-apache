@@ -405,6 +405,44 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 		print("No %s configurations to process, skipping this step" % (label))
 		return None
 
+	# If we've been asked to remove the defaults, we do so
+	removeDefaults = toBoolean(data.pop("removeDefaults", "false"))
+	if removeDefaults:
+		print("Clearing the %s configurations directory at [%s]" % (label, enabled))
+		for f in os.listdir(enabled):
+			p = os.path.join(enabled, f)
+			if os.path.isfile(p) or os.path.islink(p):
+				os.unlink(p)
+			elif os.path.isdir(p):
+				shutil.rmtree(p)
+	else:
+		# Identify the objects we've been asked to remove from the "enabled" directory,
+		# and do so. If an object we've been asked to remove doesn't exist, this isn't
+		# a problem and will only result in a warning being printed.
+		#
+		# Objects who have "enabled" set to "false" must also be removed if present
+
+		# DO THE REMOVE THING!
+		pass
+
+	# Ok so at this point we need to start identifying which objects we've been asked to
+	# add from available into enabled. Missing objects are an error, obviously. Also
+	# respect the "enabled" flag and skip adding those
+
+	# DO THE ADD THING!
+
+	#
+	# TA-DA!! We're done! The "enabled" directory should contain only the links and/or
+	# files that we want.
+	#
+
+	return
+
+
+	#
+	# Ok so here's the old algorithm ...
+	#
+
 	# First things first - make sure that the requested configuration is viable
 	# available = dict.fromkeys(listAvailable(available, extensions), True)
 	reqMain = dict.fromkeys(listAvailable(available, mainExt), True)
@@ -504,31 +542,13 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 	print("includes for %s: %s" % (name, str(includes)))
 	print("generations for %s: %s" % (name, str(generations)))
 
-def clearLinkDirectory(general, label, directory):
-	print("Clearing the %s directory at [%s]" % (label, directory))
-	for f in os.listdir(directory):
-		p = os.path.join(directory, f)
-		if os.path.isfile(file_path) or os.path.islink(file_path):
-			os.unlink(file_path)
-		elif os.path.isdir(file_path):
-			shutil.rmtree(file_path)
-
-def clearModules(general):
-	return clearLinkDirectory(general, "module", MODS_ENABLED)
-
 def processModules(general, modules):
 	print("Processing the module configurations")
 	return processLinkDirectory(general, "module" "modules", modules, MODS_AVAILABLE, MODS_ENABLED, "conf", "load", True)
 
-def clearSites(general):
-	return clearLinkDirectory(general, "site", MODS_ENABLED)
-
 def processSites(general, sites):
 	print("Processing the site configurations")
 	return processLinkDirectory(general, "site", "sites", sites, SITES_AVAILABLE, SITES_ENABLED, "conf", [])
-
-def clearConfs(general):
-	return clearLinkDirectory(general, "additional", MODS_ENABLED)
 
 def processConfs(general, confs):
 	print("Processing the additional configurations")
@@ -694,11 +714,11 @@ def renderMain(general, ssl):
 def mainBlock(config, workDir):
 	yamlData = loadConfig(config)
 	sections = []
-	sections += [( "modules", "modules",    processModules, clearModules )]
-	sections += [( "sites",   "sites",      processSites,   clearSites   )]
-	sections += [( "confs",   "additional", processConfs,   clearConfs   )]
-	sections += [( "ssl",     "SSL",        renderSsl,      None         )]
-	sections += [( "main",    "main",       renderMain,     None         )]
+	sections += [( "modules", "modules",    processModules }]
+	sections += [( "sites",   "sites",      processSites   }]
+	sections += [( "confs",   "additional", processConfs   }]
+	sections += [( "ssl",     "SSL",        renderSsl      }]
+	sections += [( "main",    "main",       renderMain     }]
 
 	# First things first - extract the TAR file into the work directory
 	try:
@@ -707,16 +727,9 @@ def mainBlock(config, workDir):
 		fail("Failed to extract the configuration defaults (rc = %d): %s" % (e.returncode, e.output))
 
 	general = {}
-	for key, label, processor, defaultsRemover in sections:
-		data = yamlData.get(key)
-
-		if data:
-			removeDefaults = data.pop("removeDefaults", "false")
-			if toBoolean(removeDefaults) and defaultsRemover:
-				defaultsRemover(general)
-
+	for key, label, processor in sections:
 		try:
-			processor(general, data)
+			processor(general, yamlData.get(key))
 		except Failure as e:
 			raise e
 		except Exception as e:
