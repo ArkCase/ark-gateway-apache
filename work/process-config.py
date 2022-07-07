@@ -500,7 +500,7 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 			trueName = data.pop("trueName", key)
 			if trueName in trueNames:
 				# Duplicate trueName values are not allowed
-				print("WARNING: duplicate 'trueName' [%s] from key [%s], already used by [%s]" % (trueName, key, trueNames[trueName]))
+				print("\tWARNING: duplicate 'trueName' [%s] from key [%s], already used by [%s] - will be skipped" % (trueName, key, trueNames[trueName]))
 				continue
 
 			# Mark the trueName as used (and by whom)
@@ -534,7 +534,7 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 
 		if trueName in trueNames:
 			# Duplicate trueName values are not allowed
-			print("WARNING: duplicate 'trueName' [%s] from key [%s], already used by [%s]" % (trueName, key, trueNames[trueName]))
+			print("\tWARNING: duplicate 'trueName' [%s] from key [%s], already used by [%s] - will be skipped" % (trueName, key, trueNames[trueName]))
 			continue
 
 		# Mark the trueName as used (and by whom)
@@ -778,6 +778,8 @@ def renderSsl(general, ssl):
 	#		pass
 
 	renderTemplate("SSL", SSL_TEMPLATE, SSL_TEMPLATE_TARGET, "root", "root", 0o644)
+	# TODO: render the template for ssl.conf, which will enable/disable ciphers, etc
+	# TODO: create the symlink for ssl.load, which should go into the modules directory
 
 def renderMain(general, ssl):
 	renderTemplate("main", MAIN_TEMPLATE, MAIN_TEMPLATE_TARGET, "root", "root", 0o644)
