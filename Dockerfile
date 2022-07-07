@@ -52,6 +52,7 @@ RUN mv "/etc/apache2" "/etc/apache2.default" && ln -s "apache2.default" "/etc/ap
 #
 WORKDIR     "/var/www"
 VOLUME      [ "/conf" ]
+VOLUME      [ "/modules" ]
 VOLUME      [ "/var/www" ]
 VOLUME      [ "/var/log/apache2" ]
 EXPOSE      80/tcp
