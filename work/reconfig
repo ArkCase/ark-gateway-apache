@@ -5,8 +5,6 @@ SCRIPT="$(basename "${SCRIPT}")"
 
 set -eu -o pipefail
 
-DEFAULT_CONFIG="/conf/config.yaml"
-
 #
 # This is the default configuration location, which can be overridden
 # via the environment
@@ -47,13 +45,7 @@ if [ ${#} -gt 0 ] ; then
 else
 	# No configuration given, use the default
 	MARKER="${$}:$(cat /proc/sys/kernel/random/uuid)"
-	if [ "${CONFIG+${MARKER}}" != "${MARKER}" ] ; then
-		if [ -e "${DEFAULT_CONFIG}" ] ; then
-			CONFIG="${DEFAULT_CONFIG}"
-		else
-			USE_DEFAULT="true"
-		fi
-	fi
+	[ "${CONFIG+${MARKER}}" != "${MARKER}" ] && USE_DEFAULT="true"
 fi
 
 if ${USE_DEFAULT} ; then
