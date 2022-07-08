@@ -244,7 +244,12 @@ def assertFile(path, silent = False):
 
 	return os.path.realpath(path)
 
-def assertLinkMissing(link):
+def ensureSymlink(source, target):
+	if os.path.lexists(target):
+		os.remove(target)
+	os.symlink(source, target)
+
+def checkLinkMissing(link):
 	if not os.path.exists(link):
 		if os.path.lexists(link):
 			os.remove(link)
@@ -450,7 +455,7 @@ def removeExisting(directory, basename):
 		except FileNotFoundError:
 			pass
 
-def linkAvailable(basename, source, target):
+def createLink(basename, source, target):
 	count = 0
 	for f in glob.glob(os.path.join(source, basename) + ".*"):
 		(p, e) = os.path.splitext(f)
@@ -459,7 +464,7 @@ def linkAvailable(basename, source, target):
 		rel = os.path.relpath(f, target)
 		link = os.path.join(target, os.path.basename(f))
 		print("\tLinking [%s] as [%s] for %s..." % (rel, link, basename))
-		os.symlink(rel, link)
+		ensureSymlink(rel, link)
 		count += 1
 	return (count > 0)
 
@@ -586,7 +591,7 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 			add = isAddValue(value)
 
 		# Step 2: always create any existing links
-		if not linkAvailable(trueName, available, enabled):
+		if not createLink(trueName, available, enabled):
 			# We only explode if this is a "simple" ADD operation (i.e. don't create custom files, don't
 			# inc:${...} anything, etc.  Just "add existing" ...
 			if add:
@@ -598,18 +603,21 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 			continue
 
 		# Prepare this value for reuse...
-		baseTarget = os.path.join(enabled, trueName)
+		baseTarget = os.path.join(available, trueName)
+		linkTarget = os.path.join(enabled, trueName)
 
 		# It's not a simple add, but we need to check if it's a string. If so, it's either
 		# an inc:${...} or the actual mainExt file's contents...
 		if isinstance(value, TYPE_STRING):
 			target = baseTarget + "." + mainExt
+			link = linkTarget + "." + mainExt
 			info = createOrInclude(value, target, 0o644, "root", "root")
 			action = "Created"
 			sourceDesc = "inlined content"
 			if info["included"]:
 				action = "Included"
 				sourceDesc = "the referenced file"
+			ensureSymlink(os.path.relpath(target, enabled), link)
 			print("\t%s custom data at [%s] from %s" % (action, target, sourceDesc))
 			continue
 
@@ -619,12 +627,14 @@ def processLinkDirectory(general, label, name, data, available, enabled, mainExt
 		for ext in value:
 			content = str(value[ext])
 			target = baseTarget + "." + ext
+			link = linkTarget + "." + ext
 			info = createOrInclude(content, target, 0o644, "root", "root")
 			action = "Created"
 			sourceDesc = "inlined content"
 			if info["included"]:
 				action = "Included"
 				sourceDesc = "the referenced file"
+			ensureSymlink(os.path.relpath(target, enabled), link)
 			print("\t%s custom data at [%s] from %s" % (action, target, sourceDesc))
 
 	#
@@ -810,17 +820,17 @@ def renderSsl(general, ssl):
 	#		pass
 
 	# If we haven't already created it, we deploy the SSL module configuration
-	if assertLinkMissing(SSL_MODULE_TEMPLATE_TARGET):
+	if checkLinkMissing(SSL_MODULE_TEMPLATE_TARGET):
 		print("Creating the SSL module configuration")
 		renderAndLinkTemplate("SSL module", SSL_MODULE_TEMPLATE, SSL_MODULE_TEMPLATE_TARGET, SSL_MODULE_TEMPLATE_LINK, MODS_ENABLED, "root", "root", 0o644)
 
 	# If we haven't already created it, we deploy the SSL module loader
-	if assertLinkMissing(SSL_MODULE_LOAD_LINK):
+	if checkLinkMissing(SSL_MODULE_LOAD_LINK):
 		print("Creating the link for the SSL module loader")
 		os.symlink(os.path.relpath(SSL_MODULE_LOAD_SRC, MODS_ENABLED), SSL_MODULE_LOAD_LINK)
 
 	# If we haven't already created it, we deploy the SSL VHost
-	if assertLinkMissing(SSL_TEMPLATE_TARGET):
+	if checkLinkMissing(SSL_TEMPLATE_TARGET):
 		print("Creating the main SSL VHost configuration")
 		renderAndLinkTemplate("SSL", SSL_TEMPLATE, SSL_TEMPLATE_TARGET, SSL_TEMPLATE_LINK, CONF_ENABLED, "root", "root", 0o644)
 
@@ -831,7 +841,7 @@ def renderSsl(general, ssl):
 		name = "socache_" + cache + ".load"
 		source = os.path.join(MODS_AVAILABLE, name)
 		target = os.path.join(MODS_ENABLED, name)
-		if assertLinkMissing(target):
+		if checkLinkMissing(target):
 			print("Creating the link for SSL %s cache support" % (cache))
 			os.symlink(os.path.relpath(source, MODS_ENABLED), target)
 
@@ -839,7 +849,7 @@ def renderMain(general, ssl):
 	renderTemplate("main", MAIN_TEMPLATE, MAIN_TEMPLATE_TARGET, "root", "root", 0o644)
 	renderTemplate("environment", ENV_TEMPLATE, ENV_TEMPLATE_TARGET, "root", "root", 0o644)
 
-	if assertLinkMissing(MAIN_WEB_TEMPLATE_LINK):
+	if checkLinkMissing(MAIN_WEB_TEMPLATE_LINK):
 		renderAndLinkTemplate("website", MAIN_WEB_TEMPLATE, MAIN_WEB_TEMPLATE_TARGET, MAIN_WEB_TEMPLATE_LINK, CONF_ENABLED, "root", "root", 0o644)
 
 def mainBlock(config, workDir):
