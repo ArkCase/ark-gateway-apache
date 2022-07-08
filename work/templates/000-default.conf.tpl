@@ -37,6 +37,16 @@
 	{{- else }}
 	#Include conf-available/serve-cgi-bin.conf
 	{{- end }}
+
+	#
+	# Extra settings lines added in the general configuration to apply to the default VHost
+	#
+	{{- range (.main).extraSettings }}
+	{{ . }}
+	{{- end }}
+	#
+	# End extra settings
+	#
 </VirtualHost>
 
 # vim: syntax=apache ts=4 sw=4 sts=4 sr noet
