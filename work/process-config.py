@@ -244,6 +244,13 @@ def assertFile(path, silent = False):
 
 	return os.path.realpath(path)
 
+def assertLinkMissing(link):
+	if not os.path.exists(link):
+		if os.path.lexists(link):
+			os.remove(link)
+		return True
+	return False
+
 def assertConfigFile(path):
 	path = assertFile(path)
 	if os.path.commonpath([CONF_DIR, path]) == "/":
@@ -802,20 +809,18 @@ def renderSsl(general, ssl):
 	#	except FileNotFoundError:
 	#		pass
 
-	if not os.path.exists(SSL_MODULE_TEMPLATE_TARGET):
-		if os.path.lexists(SSL_MODULE_TEMPLATE_TARGET):
-			os.remove(SSL_MODULE_TEMPLATE_TARGET)
+	# If we haven't already created it, we deploy the SSL module configuration
+	if assertLinkMissing(SSL_MODULE_TEMPLATE_TARGET):
 		print("Creating the SSL module configuration")
 		renderAndLinkTemplate("SSL module", SSL_MODULE_TEMPLATE, SSL_MODULE_TEMPLATE_TARGET, SSL_MODULE_TEMPLATE_LINK, MODS_ENABLED, "root", "root", 0o644)
 
-	# If we haven't already created it, we deploy the module loader
-	if not os.path.exists(SSL_MODULE_LOAD_LINK):
-		if os.path.lexists(SSL_MODULE_LOAD_LINK):
-			os.remove(SSL_MODULE_LOAD_LINK)
+	# If we haven't already created it, we deploy the SSL module loader
+	if assertLinkMissing(SSL_MODULE_LOAD_LINK):
 		print("Creating the link for the SSL module loader")
 		os.symlink(os.path.relpath(SSL_MODULE_LOAD_SRC, MODS_ENABLED), SSL_MODULE_LOAD_LINK)
 
-	if not os.path.exists(SSL_TEMPLATE_TARGET):
+	# If we haven't already created it, we deploy the SSL VHost
+	if assertLinkMissing(SSL_TEMPLATE_TARGET):
 		print("Creating the main SSL VHost configuration")
 		renderAndLinkTemplate("SSL", SSL_TEMPLATE, SSL_TEMPLATE_TARGET, SSL_TEMPLATE_LINK, CONF_ENABLED, "root", "root", 0o644)
 
@@ -826,16 +831,16 @@ def renderSsl(general, ssl):
 		name = "socache_" + cache + ".load"
 		source = os.path.join(MODS_AVAILABLE, name)
 		target = os.path.join(MODS_ENABLED, name)
-		if not os.path.exists(target):
-			if os.path.lexists(target):
-				os.remove(target)
+		if assertLinkMissing(target):
 			print("Creating the link for SSL %s cache support" % (cache))
 			os.symlink(os.path.relpath(source, MODS_ENABLED), target)
 
 def renderMain(general, ssl):
 	renderTemplate("main", MAIN_TEMPLATE, MAIN_TEMPLATE_TARGET, "root", "root", 0o644)
-	renderAndLinkTemplate("website", MAIN_WEB_TEMPLATE, MAIN_WEB_TEMPLATE_TARGET, MAIN_WEB_TEMPLATE_LINK, CONF_ENABLED, "root", "root", 0o644)
 	renderTemplate("environment", ENV_TEMPLATE, ENV_TEMPLATE_TARGET, "root", "root", 0o644)
+
+	if assertLinkMissing(MAIN_WEB_TEMPLATE_LINK):
+		renderAndLinkTemplate("website", MAIN_WEB_TEMPLATE, MAIN_WEB_TEMPLATE_TARGET, MAIN_WEB_TEMPLATE_LINK, CONF_ENABLED, "root", "root", 0o644)
 
 def mainBlock(config, workDir):
 	yamlData = loadConfig(config)
