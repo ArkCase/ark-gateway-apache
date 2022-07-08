@@ -33,6 +33,8 @@ APACHE_DIR = "/etc/apache2"
 TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 CONF_DIR = "/conf"
+DEFAULT_CONFIG_NAME = "config.yaml"
+DEFAULT_CONFIG = os.path.join(CONF_DIR, DEFAULT_CONFIG_NAME)
 BACKUP_DIR = os.path.join(CONF_DIR, ".backups")
 
 WORK_ROOT = "/work"
@@ -207,6 +209,7 @@ def loadConfig(config):
 		print("WARNING: no configuration data was given, returning an empty dict")
 		return {}
 
+	print("Applying the configurations from [%s]..." % (config))
 	with open(config, "r") as document:
 		try:
 			yamlData = load(document, Loader=Loader)
@@ -918,7 +921,7 @@ def mainBlock(config, workDir):
 
 	print("Backing up the configurations...")
 	os.makedirs(BACKUP_DIR, mode=0o755, exist_ok=True)
-	backup = BACKUP_DIR + "/config.yaml." + TIMESTAMP
+	backup = os.path.join(BACKUP_DIR, DEFAULT_CONFIG_NAME + "." + TIMESTAMP)
 	shutil.copy(config, backup)
 	print("Configurations successfully stored for backup as [%s]!" % (backup))
 	return 0
@@ -929,14 +932,25 @@ def mainBlock(config, workDir):
 
 # If we're given no arguments, we just apply the default configuration
 if len(sys.argv) == 1:
-	CONFIG = NULL_CONFIG
-	CONFIG_DIR = CONF_DIR
-else:
-	if len(sys.argv) != 2:
-		print("usage: %s configuration-file.yaml" % sys.argv[0])
+
+	# First things first - if the default config file is there, use it
+	try:
+		CONFIG = assertConfigFile(DEFAULT_CONFIG)
+		CONFIG_DIR = os.path.dirname(CONFIG)
+	except FileNotFoundError as e:
+		# The file is not there, so keep going without any configuration
+		CONFIG = NULL_CONFIG
+		CONFIG_DIR = CONF_DIR
+	except Exception as e:
+		print("Failed to access the default configuration at [%s]: %s" % (DEFAULT_CONFIG, strExc(e)))
 		sys.exit(1)
 
-	CONFIG = assertFile(sys.argv[1])
+else:
+	if len(sys.argv) != 2:
+		print("usage: %s [configuration-file.yaml]" % sys.argv[0])
+		sys.exit(1)
+
+	CONFIG = assertConfigFile(sys.argv[1])
 	CONFIG_DIR = os.path.dirname(CONFIG)
 
 deleteWork = False
