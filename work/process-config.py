@@ -36,6 +36,7 @@ CONF_DIR = "/conf"
 BACKUP_DIR = os.path.join(CONF_DIR, ".backups")
 
 WORK_ROOT = "/work"
+NULL_CONFIG = os.path.join(WORK_ROOT, "null.yaml")
 TEMPLATE_DIR = os.path.join(WORK_ROOT, "templates")
 DEFAULTS_TAR_GZ = os.path.join(WORK_ROOT, "defaults.tar.gz")
 WORK_DIR = APACHE_DIR + "." + TIMESTAMP
@@ -202,6 +203,10 @@ def fail(message, exitCode = 1):
 	raise Failure(exitCode)
 
 def loadConfig(config):
+	if config is None or config == NULL_CONFIG:
+		print("WARNING: no configuration data was given, returning an empty dict")
+		return {}
+
 	with open(config, "r") as document:
 		try:
 			yamlData = load(document, Loader=Loader)
@@ -921,12 +926,18 @@ def mainBlock(config, workDir):
 #
 # Begin the primary execution cycle
 #
-if len(sys.argv) != 2:
-	fail("usage: %s configuration-file.yaml" % sys.argv[0])
 
-CONFIG = assertFile(sys.argv[1])
-CONFIG_DIR = os.path.dirname(CONFIG)
+# If we're given no arguments, we just apply the default configuration
+if len(sys.argv) == 1:
+	CONFIG = NULL_CONFIG
+	CONFIG_DIR = CONF_DIR
+else:
+	if len(sys.argv) != 2:
+		print("usage: %s configuration-file.yaml" % sys.argv[0])
+		sys.exit(1)
 
+	CONFIG = assertFile(sys.argv[1])
+	CONFIG_DIR = os.path.dirname(CONFIG)
 
 deleteWork = False
 retCode = 0
