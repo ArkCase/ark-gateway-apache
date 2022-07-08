@@ -33,44 +33,45 @@ APACHE_DIR = "/etc/apache2"
 TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 CONF_DIR = "/conf"
-BACKUP_DIR = CONF_DIR + "/.backups"
+BACKUP_DIR = os.path.join(CONF_DIR, ".backups")
 
 WORK_ROOT = "/work"
-WORK_TMP = WORK_ROOT + "/.tmp"
-TEMPLATE_DIR = WORK_ROOT + "/templates"
-DEFAULTS_TAR_GZ = WORK_ROOT + "/defaults.tar.gz"
+TEMPLATE_DIR = os.path.join(WORK_ROOT, "templates")
+DEFAULTS_TAR_GZ = os.path.join(WORK_ROOT, "defaults.tar.gz")
 WORK_DIR = APACHE_DIR + "." + TIMESTAMP
 os.makedirs(WORK_DIR, mode=0o755, exist_ok=False)
 shutil.chown(WORK_DIR, "root", "root")
 
 SSL_GID = os.environ["SSL_GID"]
-SSL_DIR = WORK_DIR + "/ssl"
+SSL_DIR = os.path.join(WORK_DIR, "ssl")
 
-PATH_CERT = SSL_DIR + "/cert.pem"
-PATH_KEY = SSL_DIR + "/key.pem"
-PATH_CA = SSL_DIR + "/ca.pem"
-PATH_CRL = SSL_DIR + "/crl.pem"
+PATH_CERT = os.path.join(SSL_DIR, "cert.pem")
+PATH_KEY = os.path.join(SSL_DIR, "key.pem")
+PATH_CA = os.path.join(SSL_DIR, "ca.pem")
+PATH_CRL = os.path.join(SSL_DIR, "crl.pem")
 
-CONF_AVAILABLE = WORK_DIR + "/conf-available"
-CONF_ENABLED = WORK_DIR + "/conf-enabled"
+CONF_AVAILABLE = os.path.join(WORK_DIR, "conf-available")
+CONF_ENABLED = os.path.join(WORK_DIR, "conf-enabled")
 
-MODS_AVAILABLE = WORK_DIR + "/mods-available"
-MODS_ENABLED = WORK_DIR + "/mods-enabled"
+MODS_AVAILABLE = os.path.join(WORK_DIR, "mods-available")
+MODS_ENABLED = os.path.join(WORK_DIR, "mods-enabled")
 
-SITES_AVAILABLE = WORK_DIR + "/sites-available"
-SITES_ENABLED = WORK_DIR + "/sites-enabled"
+SITES_AVAILABLE = os.path.join(WORK_DIR, "sites-available")
+SITES_ENABLED = os.path.join(WORK_DIR, "sites-enabled")
 
 SSL_TEMPLATE_TARGET = "default-ssl.conf"
-SSL_TEMPLATE = TEMPLATE_DIR + "/" + SSL_TEMPLATE_TARGET + ".tpl"
-SSL_TEMPLATE_TARGET = SITES_ENABLED + "/" + SSL_TEMPLATE_TARGET
+SSL_TEMPLATE = os.path.join(TEMPLATE_DIR, SSL_TEMPLATE_TARGET + ".tpl")
+SSL_TEMPLATE_LINK = os.path.join(SITES_ENABLED, SSL_TEMPLATE_TARGET)
+SSL_TEMPLATE_TARGET = os.path.join(SITES_AVAILABLE, SSL_TEMPLATE_TARGET)
 
 SSL_MODULE_TEMPLATE_TARGET = "ssl.conf"
-SSL_MODULE_TEMPLATE = TEMPLATE_DIR + "/" + SSL_MODULE_TEMPLATE_TARGET + ".tpl"
-SSL_MODULE_TEMPLATE_TARGET = MODS_ENABLED + "/" + SSL_MODULE_TEMPLATE_TARGET
+SSL_MODULE_TEMPLATE = os.path.join(TEMPLATE_DIR, SSL_MODULE_TEMPLATE_TARGET + ".tpl")
+SSL_MODULE_TEMPLATE_LINK = os.path.join(MODS_ENABLED, SSL_MODULE_TEMPLATE_TARGET)
+SSL_MODULE_TEMPLATE_TARGET = os.path.join(MODS_AVAILABLE, SSL_MODULE_TEMPLATE_TARGET)
 
 SSL_MODULE_LOAD_LINK = "ssl.load"
-SSL_MODULE_LOAD_SRC = MODS_AVAILABLE + "/" + SSL_MODULE_LOAD_LINK
-SSL_MODULE_LOAD_LINK = MODS_ENABLED + "/" + SSL_MODULE_LOAD_LINK
+SSL_MODULE_LOAD_SRC = os.path.join(MODS_AVAILABLE, SSL_MODULE_LOAD_LINK)
+SSL_MODULE_LOAD_LINK = os.path.join(MODS_ENABLED, SSL_MODULE_LOAD_LINK)
 
 SSL_DEFAULT_CACHES = [ "dbm", "memcache", "redis", "shmcb" ]
 
@@ -80,16 +81,17 @@ SSL_DEFAULT_CA = "inc:/ca.pem"
 SSL_DEFAULT_CRL = "inc:/crl.pem"
 
 ENV_TEMPLATE_TARGET = "envvars"
-ENV_TEMPLATE = TEMPLATE_DIR + "/" + ENV_TEMPLATE_TARGET + ".tpl"
-ENV_TEMPLATE_TARGET = WORK_DIR + "/" + ENV_TEMPLATE_TARGET
+ENV_TEMPLATE = os.path.join(TEMPLATE_DIR, ENV_TEMPLATE_TARGET + ".tpl")
+ENV_TEMPLATE_TARGET = os.path.join(WORK_DIR, ENV_TEMPLATE_TARGET)
 
 MAIN_TEMPLATE_TARGET = "apache2.conf"
-MAIN_TEMPLATE = TEMPLATE_DIR + "/" + MAIN_TEMPLATE_TARGET + ".tpl"
-MAIN_TEMPLATE_TARGET = WORK_DIR + "/" + MAIN_TEMPLATE_TARGET
+MAIN_TEMPLATE = os.path.join(TEMPLATE_DIR, MAIN_TEMPLATE_TARGET + ".tpl")
+MAIN_TEMPLATE_TARGET = os.path.join(WORK_DIR, MAIN_TEMPLATE_TARGET)
 
 MAIN_WEB_TEMPLATE_TARGET = "000-default.conf"
-MAIN_WEB_TEMPLATE = TEMPLATE_DIR + "/" + MAIN_WEB_TEMPLATE_TARGET + ".tpl"
-MAIN_WEB_TEMPLATE_TARGET = SITES_ENABLED + "/" + MAIN_WEB_TEMPLATE_TARGET
+MAIN_WEB_TEMPLATE = os.path.join(TEMPLATE_DIR, MAIN_WEB_TEMPLATE_TARGET + ".tpl")
+MAIN_WEB_TEMPLATE_LINK = os.path.join(SITES_ENABLED, MAIN_WEB_TEMPLATE_TARGET)
+MAIN_WEB_TEMPLATE_TARGET = os.path.join(SITES_AVAILABLE, MAIN_WEB_TEMPLATE_TARGET)
 
 INC_PARSER = re.compile("^inc:(.+)$")
 
@@ -324,10 +326,10 @@ def createOrInclude(value, target=None, mode=None, user=None, group=None):
 		path = m.group(1)
 		if os.path.isabs(path):
 			# Absolute paths will be calculated based off of CONF_DIR
-			path = CONF_DIR + "/" + path
+			path = os.path.join(CONF_DIR, path)
 		else:
 			# Relative paths will be calculated based off of CONFIG_DIR
-			path = CONFIG_DIR + "/" + path
+			path = os.path.join(CONFIG_DIR, path)
 		path = assertConfigFile(os.path.normpath(path))
 		if target is None:
 			path = copyToTemp(path)
@@ -397,7 +399,7 @@ def listAvailable(src, ext):
 
 	ret = []
 	for f in os.listdir(src):
-		p = src + "/" + f
+		p = os.path.join(src, f)
 		if os.path.isfile(p):
 			for e in ext:
 				e = "." + e
@@ -658,6 +660,19 @@ def renderTemplate(label, template, target, user=None, group=None, mode=None):
 
 	return target
 
+def renderAndLinkTemplate(label, template, target, link, linkRel, user=None, group=None, mode=None):
+	rendered = renderTemplate(label, template, target, user, group, mode)
+	try:
+		os.remove(link)
+	except FileNotFoundError:
+		pass
+
+	src = rendered
+	if linkRel is not None:
+		src = os.path.relpath(src, linkRel)
+	os.symlink(src, link)
+	return link
+
 def renderSsl(general, ssl):
 
 	if not ssl:
@@ -788,8 +803,10 @@ def renderSsl(general, ssl):
 	#		pass
 
 	if not os.path.exists(SSL_MODULE_TEMPLATE_TARGET):
+		if os.path.lexists(SSL_MODULE_TEMPLATE_TARGET):
+			os.remove(SSL_MODULE_TEMPLATE_TARGET)
 		print("Creating the SSL module configuration")
-		renderTemplate("SSL module", SSL_MODULE_TEMPLATE, SSL_MODULE_TEMPLATE_TARGET, "root", "root", 0o644)
+		renderAndLinkTemplate("SSL module", SSL_MODULE_TEMPLATE, SSL_MODULE_TEMPLATE_TARGET, SSL_MODULE_TEMPLATE_LINK, MODS_ENABLED, "root", "root", 0o644)
 
 	# If we haven't already created it, we deploy the module loader
 	if not os.path.exists(SSL_MODULE_LOAD_LINK):
@@ -800,7 +817,7 @@ def renderSsl(general, ssl):
 
 	if not os.path.exists(SSL_TEMPLATE_TARGET):
 		print("Creating the main SSL VHost configuration")
-		renderTemplate("SSL", SSL_TEMPLATE, SSL_TEMPLATE_TARGET, "root", "root", 0o644)
+		renderAndLinkTemplate("SSL", SSL_TEMPLATE, SSL_TEMPLATE_TARGET, SSL_TEMPLATE_LINK, CONF_ENABLED, "root", "root", 0o644)
 
 	#
 	# Finally, enable the cache modules that mod_ssl may require
@@ -817,7 +834,7 @@ def renderSsl(general, ssl):
 
 def renderMain(general, ssl):
 	renderTemplate("main", MAIN_TEMPLATE, MAIN_TEMPLATE_TARGET, "root", "root", 0o644)
-	renderTemplate("website", MAIN_WEB_TEMPLATE, MAIN_WEB_TEMPLATE_TARGET, "root", "root", 0o644)
+	renderAndLinkTemplate("website", MAIN_WEB_TEMPLATE, MAIN_WEB_TEMPLATE_TARGET, MAIN_WEB_TEMPLATE_LINK, CONF_ENABLED, "root", "root", 0o644)
 	renderTemplate("environment", ENV_TEMPLATE, ENV_TEMPLATE_TARGET, "root", "root", 0o644)
 
 def mainBlock(config, workDir):
