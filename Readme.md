@@ -193,3 +193,4 @@ modules:
 #   conf-N: inc:...
 ```
 
+The intent behind using this simplified configuration model is to allow flexibility to simply enable/disable modules rapidly, as well as more complex configuration if desired.  There are few limitations to what can be achieved using this configuration model.
