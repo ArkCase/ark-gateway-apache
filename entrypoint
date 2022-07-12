@@ -5,9 +5,9 @@ set -eu -o pipefail
 #
 # Apply the reconfigurations
 #
-. /work/reconfig || exit ${?}
+/work/reconfig || exit ${?}
 
 #
 # All is well, start Apache in the foreground
 #
-echo /usr/sbin/apache2ctl -DFOREGROUND "${@}"
+exec /usr/sbin/apache2ctl -DFOREGROUND "${@}"
