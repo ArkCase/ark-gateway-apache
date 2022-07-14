@@ -1,0 +1,30 @@
+#!/bin/bash
+
+say() {
+	echo -e "${@}"
+}
+
+fail() {
+	say "${@}" 1>&2
+	exit ${EXIT_CODE:-1}
+}
+
+[ ${#} -gt 1 ] && fail "usage: ${0} [directory]"
+
+DIR="${1}"
+if [ ${#} -eq 1 ] ; then
+	DIR="${1}"
+	[ -z "${DIR}" ] && fail "The directory must be a non-empty string"
+else
+	DIR="/etc/apache2"
+fi
+
+[ -e "${DIR}" ] || fail "The directory [${DIR}] does not exist"
+[ -d "${DIR}" ] || fail "The path [${DIR}] is not a directory"
+[ -r "${DIR}" ] || fail "The directory [${DIR}] is not readable"
+[ -x "${DIR}" ] || fail "The directory [${DIR}] is not executable"
+
+ENV="${DIR}/envvars"
+[ -f "${ENV}" ] && . "${ENV}"
+
+exec /usr/sbin/apache2ctl -t -d "${DIR}"

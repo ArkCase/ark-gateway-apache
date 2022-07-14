@@ -1,0 +1,70 @@
+#!/bin/bash
+SCRIPT="$(readlink -f "${0}")"
+BASEDIR="$(dirname "${SCRIPT}")"
+SCRIPT="$(basename "${SCRIPT}")"
+
+set -eu -o pipefail
+
+#
+# This is the default configuration location, which can be overridden
+# via the environment
+#
+
+timestamp() {
+	date "+%Y/%m/%d %H:%M:%S %Z"
+}
+
+say() {
+	echo -e "$(timestamp): ${@}"
+}
+
+err() {
+	say "ERROR - ${@}" 1>&2
+}
+
+fail() {
+	say "${@}" 1>&2
+	exit ${EXIT_CODE:-1}
+}
+
+#
+# First things first, some housekeeping
+#
+APACHECTL="$(which "apache2ctl")"
+[ -z "${APACHECTL}" ] && fail "Could not find the apachectl executable in the path - cannot continue"
+
+#
+# Make sure we identify whether we're being asked to configure from a
+# specific file, or we're assuming a default that may or may not
+# exist
+#
+USE_DEFAULT="false"
+if [ ${#} -gt 0 ] ; then
+	CONFIG="${1}"
+	[ -z "${CONFIG}" ] && fail "The configuration name may not be the empty string"
+else
+	# No configuration given, use the default
+	MARKER="${$}:$(cat /proc/sys/kernel/random/uuid)"
+	[ "${CONFIG+${MARKER}}" != "${MARKER}" ] && USE_DEFAULT="true"
+fi
+
+if ${USE_DEFAULT} ; then
+	# This trick allows us to have no configuration value and still have
+	# the main command work just fine
+	CONFIG=()
+elif [ -e "${CONFIG}" ] ; then
+	# Make sure the file we were told to use is there and usable
+	[ -f "${CONFIG}" ] || fail "The item at [${CONFIG}] is not a regular file - cannot continue"
+	[ -r "${CONFIG}" ] || fail "The file at [${CONFIG}] is not readable - cannot continue"
+	say "Configuring from [${CONFIG}]"
+	# This trick allows us to have no configuration value and still have
+	# the main command work just fine
+	CONFIG=("${CONFIG}")
+else
+	# If we're not using a default value (i.e. using the environment or a parameter), 
+	# then this is an error and we must explode accordingly
+	fail "The configuration file [${CONFIG}] could not be found"
+fi
+
+# Finally, do the actual work ...
+"${BASEDIR}/process-config.py" "${CONFIG[@]}" || EXIT_CODE=${?} fail "Failed to apply the configurations from [${CONFIG}]"

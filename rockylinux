@@ -1,0 +1,21 @@
+yum -y install epel-release && \
+    yum -y update && \
+    yum -y install yum-utils which && \
+    yum-config-manager \
+        --enable devel \
+        --enable powertools
+
+yum -y install \
+    httpd \
+    httpd-tools \
+    keycloak-httpd-client-install \
+    mod_auth_gssapi \
+    mod_auth_mellon \
+    mod_auth_token \
+    mod_fcgid \
+    mod_ldap \
+    mod_proxy_html \
+    mod_security \
+    mod_session \
+    mod_ssl \
+    vim

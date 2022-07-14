@@ -1,47 +1,11 @@
-# ArkCase Gateway using Apache Reverse Proxying
-
-This container provides an easy mechanism to deploy an Apache server which can be very flexibly configured using YAML. It's meant to be used as a reverse proxy in front of "whatever", but can really be used to serve up anything else we wish.
-
-This is an example configuration file that can be used:
-
-```yaml
-################################################################################
-# NOTE: Not all sections/options are required - this is simply an example      #
-#       illustrating the options that are available to be used within this     #
-#       configuration file                                                     #
-################################################################################
-
 main:
-  serverAdmin: "webmaster@localhost"
-  documentRoot: "/var/www/html"
-  timeOut: 300
-  keepAlive: "On"
-  maxKeepAliveRequests: 100
-  keepAliveTimeout: 5
-  hostnameLookups: "Off"
-  accessFileName: ".htaccess"
-  log:
-    level: warn
-    error: "${APACHE_LOG_DIR}/error.log"
-    custom: "${APACHE_LOG_DIR}/access.log combined"
-  includes:
-    - "/some/path/include-file-1.conf"
-    - "/some/path/include-file-2.conf"
-    # ...
-    - "/some/path/include-file-3.conf"
+  # serverRoot: "/var/www/www"
 
 ssl:
   cert: inc:cert.pem
   key: inc:key.pem
   ca:
-    # This "inc:..." syntax allows us to include files as required,
-    # such that we have some flexibility regarding the files' location.
-    # an absolute path is computed relative to /conf, while a relative
-    # path is computed relative to the location of the configuration file
-    # being consumed by the configurator tool (by default /conf as well)
     - inc:ca.1
-
-    # File contents may also be provided inline
     - |
       -----BEGIN CERTIFICATE-----
       MIIFQjCCBCqgAwIBAgIBEjANBgkqhkiG9w0BAQsFADCBtzELMAkGA1UEBhMCQ1Ix
@@ -75,8 +39,44 @@ ssl:
       Wqj5ONAY
       -----END CERTIFICATE-----
 
-  # serverAdmin: "server.admin.for@ssl.server"
-  # documentRoot: "/document/root/for/the/SSL/server"
+  crl:
+    - inc:crl.1
+    - inc:crl.2
+    # ...
+    - |
+      -----BEGIN CERTIFICATE-----
+      MIIFOjCCBCKgAwIBAgIBGTANBgkqhkiG9w0BAQsFADCBtzELMAkGA1UEBhMCQ1Ix
+      ETAPBgNVBAgTCFNhbiBKb3NlMRIwEAYDVQQHEwlTYW50YSBBbmExFzAVBgNVBAoT
+      DkVydWRpY2l0eSBTLkEuMRwwGgYDVQQLExNTZWN1cml0eSBPcGVyYXRpb25zMSMw
+      IQYDVQQDExpFcnVkaWNpdHkgMjA0OC1iaXQgUm9vdCBDQTElMCMGCSqGSIb3DQEJ
+      ARYWc2VjdXJpdHlAZXJ1ZGljaXR5LmNvbTAeFw0yMDA3MTYwMDQ0NTdaFw0zMDA3
+      MTQwMDQ0NTdaMIGVMQswCQYDVQQGEwJDUjERMA8GA1UECBMIU2FuIEpvc2UxFzAV
+      BgNVBAoTDkVydWRpY2l0eSBTLkEuMRwwGgYDVQQLExNTZWN1cml0eSBPcGVyYXRp
+      b25zMRUwEwYDVQQDFAwqLnJpdmVyYS5wcnYxJTAjBgkqhkiG9w0BCQEWFnNlY3Vy
+      aXR5QGVydWRpY2l0eS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIB
+      AQDUSAQz2xHVbg1l3LEUF2C7xkG0YGhZdGjiundvMShOA/V6k996kQFyJIhptD9L
+      SdIH3TyWL5oh5cljla12+u2f5Mq9G1zMBg6NBa0Eu2WJHe1B/GEryL3sPM5smAS4
+      s+cI6CAayG3quH3buUiVzTD5k06lExXZF64JZYXdQkXSbn1PJsElTXIGHyaCw8b8
+      sdjyeP7D6Oc4i1XmvjJsCz7CB9Si4D/Xd53NipseAzNig7xjNDYopr3H0ou5aU7s
+      zhCSDTwsLkTlsDLTXro5hIEe6TX/kyvCvuoU+gLVMx8hTC559kN4X+lmnL5/PTVW
+      9Po6NN5p7GyFg2a0mEf/lzNZAgMBAAGjggFvMIIBazAJBgNVHRMEAjAAMCwGCWCG
+      SAGG+EIBDQQfFh1PcGVuU1NMIEdlbmVyYXRlZCBDZXJ0aWZpY2F0ZTAdBgNVHQ4E
+      FgQUXfJguaRy6HTzP1I9gqSTKySDXBYwgfcGA1UdIwSB7zCB7IAUC9awD9S0ueXG
+      Djj+aYFSNwZeheyhgb2kgbowgbcxCzAJBgNVBAYTAkNSMREwDwYDVQQIEwhTYW4g
+      Sm9zZTESMBAGA1UEBxMJU2FudGEgQW5hMRcwFQYDVQQKEw5FcnVkaWNpdHkgUy5B
+      LjEcMBoGA1UECxMTU2VjdXJpdHkgT3BlcmF0aW9uczEjMCEGA1UEAxMaRXJ1ZGlj
+      aXR5IDIwNDgtYml0IFJvb3QgQ0ExJTAjBgkqhkiG9w0BCQEWFnNlY3VyaXR5QGVy
+      dWRpY2l0eS5jb22CFEoZr51ZIRDl1uMoEUG+nOeSQoocMBcGA1UdEQQQMA6CDCou
+      cml2ZXJhLnBydjANBgkqhkiG9w0BAQsFAAOCAQEAdgP+VPcQq1kbD3EOIbpNKaUD
+      BiYCis1WRUD3NMGjilhxQvAJaspjwume+RNff7H0cAPhNpUAiTcqjRYbEgi2j2Yf
+      pu9OaX92/ofeg5G7VP/40H2FJTkxliXaJ34k0LBX7XJYZbn6d4z46Xj77gcM3np5
+      T1wLFSVU/EG2IZOMHYeJzzpDvElwtPTxU0pdlXJc1zFoajpURSCvAcyKwR2OHsTU
+      vLfeYSkkvLmZNE0zsWfDVosdpuZlmLS9ulI9XW3UPdVT+Aq+Cjt5nqHm0RBbDXhG
+      WTm/uHMSpJQUKRG+HwPn6hMsAtGgJ7MBAOkMhv6W66LMkcuqe5bR+gi0p6EmIw==
+      -----END CERTIFICATE-----
+
+  # serverAdmin: kaka@test
+  # documentRoot: /www
   # logLevel: "info ssl:warn"
   # client:
   #   verify: require
@@ -99,7 +99,7 @@ ssl:
   #     nokeepalive ssl-unclean-shutdown \
   #     downgrade-1.0 force-response-1.0
   #   other: |
-  #     ... other sections that are needed go here ...
+  #     ... other sections that need to go here ...
   # module:
   #   randomSeed:
   #     - startup builtin
@@ -122,29 +122,9 @@ ssl:
   #   insecureRenegotiation: On
   #   strictSNIVHostCheck: On
 
-#
-# Use the module's name here. I.e. for mod_proxy, use "proxy", etc.
-#
 modules:
-  # The key is the module name (unless "trueName" is used), and
-  # the value can either be an instruction to add the module (via
-  # the words "add", "enable", "enabled", "on", "true", "yes", "y"), or
-  # an instruction to remove the module if it's enabled (via the words
-  # "remove", "delete",  "off", "disabled", "disable", "false", "no", "n").
-  #
-  # Any other content will be interpreted as the contents of the module's
-  # "conf" file, and will be used as such.
   alias: add
-
-  # If using a map, the keys are the extensions of the files that need
-  # to be created, and the values are their contents. You can use inc:...
-  # here as well if you wish to bring the contents in from another file.
-  #
-  # The special case is the key "enabled" which is a boolean (true/false)
-  # which controls whether the configuration for the module should be
-  # applied (true) or not (false).
   auth_basic:
-    enabled: true
     load: |
       # This is example load data for auth_basic
       # Depends: authn_core
@@ -166,11 +146,8 @@ modules:
   weird-name-2:
     trueName: ssl
     enabled: true
-  ssl: this should break and be ignored because the "trueName" ssl is in use
+  ssl: this should break and be ignored
 
-# This section works simliar to the modules in every respect, except that the
-# configurations go into sites-enabled
-#
 # sites:
 #   site-1: boolean
 #   site-2:
@@ -180,17 +157,11 @@ modules:
 #   # ...
 #   site-N: ...
 
-# This section works simliar to the modules and sites in every respect, except
-# that the configurations go into conf-enabled
-#
 # confs:
-#   conf-1: add/remove/etc
+#   conf-1: boolean
 #   conf-2:
-#     enabled: true/false
+#     enabled: boolean
 #     conf: |
 #       contents of the additional configuration
 #   # ...
-#   conf-N: inc:...
-```
-
-The intent behind using this simplified configuration model is to allow flexibility to simply enable/disable modules rapidly, as well as more complex configuration if desired.  There are few limitations to what can be achieved using this configuration model.
+#   conf-N: ...
