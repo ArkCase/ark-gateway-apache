@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -eu -o pipefail
+
+#
+# Apply the reconfigurations
+#
+exec /work/reconfig -t

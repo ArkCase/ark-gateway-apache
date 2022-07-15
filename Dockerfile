@@ -39,7 +39,7 @@ RUN apt-get install -y \
 RUN curl -L -o /usr/local/bin/gucci "${GUCCI_SRC}" && chmod a+rx /usr/local/bin/gucci
 RUN usermod -a -G "${SSL_GID}" "${UID}"
 RUN mkdir -p "${WORK_TPL}"
-COPY "entrypoint" "reload" "/"
+COPY "entrypoint" "reload" "check-config" "/"
 COPY "work" "${WORK_DIR}"
 RUN chown -R "root:" "${WORK_DIR}" && chmod 0750 "${WORK_DIR}"
 RUN mkdir -p "${BAK_DIR}" && chown -R "root:" "${BAK_DIR}" && chmod 0750 "${BAK_DIR}"
