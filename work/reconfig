@@ -1,4 +1,5 @@
 #!/bin/bash
+CALLED="${0}"
 SCRIPT="$(readlink -f "${0}")"
 BASEDIR="$(dirname "${SCRIPT}")"
 SCRIPT="$(basename "${SCRIPT}")"
@@ -27,11 +28,32 @@ fail() {
 	exit ${EXIT_CODE:-1}
 }
 
+usage() {
+	echo -e "usage: ${CALLED} [-t] [-d] [-h] [config.yaml]" 1>&2
+	exit 1
+}
+
 #
 # First things first, some housekeeping
 #
 APACHECTL="$(which "apache2ctl")"
 [ -z "${APACHECTL}" ] && fail "Could not find the apachectl executable in the path - cannot continue"
+
+DRY_RUN="false"
+DEBUG="false"
+while getopts ":tdh" OPT "${@}" ; do
+	case "${OPT}" in
+		t )		DRY_RUN="true" ;;
+		d )		DEBUG="true" ;;
+		: )		fail "Option -${OPTARG} requires an argument" ;;
+		\? )	echo -e "Option -${OPTARG} is unrecognized" 1>&2 ;&
+		h )		usage ;;
+	esac
+done
+shift $(( ${OPTIND} - 1 ))
+export DRY_RUN
+export DEBUG
+"${DEBUG}" && say "Enabled DEBUG mode" && set -x
 
 #
 # Make sure we identify whether we're being asked to configure from a
@@ -66,5 +88,13 @@ else
 	fail "The configuration file [${CONFIG}] could not be found"
 fi
 
+# Adjust for dry runs...
+ACTION="apply"
+export DRY_RUN
+if ${DRY_RUN} ; then
+	say "Operating in dry-run mode - will only validate the configurations"
+	ACTION="validate"
+fi
+
 # Finally, do the actual work ...
-"${BASEDIR}/process-config.py" "${CONFIG[@]}" || EXIT_CODE=${?} fail "Failed to apply the configurations from [${CONFIG}]"
+"${BASEDIR}/process-config.py" "${CONFIG[@]}" || EXIT_CODE=${?} fail "Failed to ${ACTION} the configurations from [${CONFIG}]"
