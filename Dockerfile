@@ -5,7 +5,7 @@ FROM ubuntu:latest
 #
 ARG ARCH="amd64"
 ARG OS="linux"
-ARG VER="1.0.0"
+ARG VER="1.0.1"
 ARG PKG="ark-gateway-apache"
 ARG SRC="${PKG}-${VER}.${OS}-${ARCH}"
 ARG UID="www-data"
