@@ -112,7 +112,7 @@ except ImportError:
 #
 def strExc(e):
 	if DEBUG:
-		return traceback.format_exc()
+		return "".join(traceback.format_exception(e))
 	return str(e)
 
 # 
