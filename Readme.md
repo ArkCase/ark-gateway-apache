@@ -1,4 +1,4 @@
-# ArkCase Gateway using Apache Reverse Proxying
+# ArkCase Gateway for Arkcase using Apache Reverse Proxying
 
 This container provides an easy mechanism to deploy an Apache server which can be very flexibly configured using YAML. It's meant to be used as a reverse proxy in front of "whatever", but can really be used to serve up anything else we wish.
 
